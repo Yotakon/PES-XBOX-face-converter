@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Colores tomados del icono: verde Xbox, amarillo de la flecha y azul marino del fondo. -->
+<resources>
+    <color name="brand_green">#3DAE2B</color>
+    <color name="brand_green_dark">#1E6E14</color>
+    <color name="brand_yellow">#FFC21A</color>
+    <color name="brand_navy">#0B1A33</color>
+
+    <color name="preview_grass">#5A8C5A</color>
+    <color name="status_error">#B3261E</color>
+</resources>

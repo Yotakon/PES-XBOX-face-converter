@@ -1,24 +1,25 @@
 package com.yotakon.pesport;
 
-import android.app.AlertDialog;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.text.Editable;
-import android.text.InputFilter;
 import android.text.TextWatcher;
 import android.util.TypedValue;
+import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
-import android.widget.ScrollView;
-import android.widget.SeekBar;
 import android.widget.TextView;
 
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.slider.Slider;
+import com.google.android.material.textfield.TextInputEditText;
 import com.yotakon.pesport.core.Converter;
 import com.yotakon.pesport.core.Texture;
+
+import java.util.Locale;
 
 /** Selector de color y brillo del pelo con vista previa de la textura teñida. */
 final class ColorDialog {
@@ -31,92 +32,77 @@ final class ColorDialog {
     private static final String[] PRESET_NAMES = {"Negro", "Castaño oscuro", "Castaño", "Castaño claro",
             "Rubio", "Rubio claro", "Pelirrojo", "Gris", "Canoso"};
 
+    private static final float BRIGHT_MIN = 0.5f, BRIGHT_MAX = 2.0f, BRIGHT_STEP = 0.05f;
+
     private ColorDialog() {
     }
 
-    static void show(final Context ctx, final byte[] ps2Bin, int rgb, double brightness, final Listener listener) {
-        final int[] color = {rgb};
-        final double[] bright = {brightness};
-        final int pad = dp(ctx, 12);
+    static String hex(int rgb) {
+        return String.format(Locale.ROOT, "#%06X", rgb & 0xFFFFFF);
+    }
 
-        LinearLayout root = new LinearLayout(ctx);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(pad, pad, pad, pad);
+    private static float snapBrightness(double b) {
+        double clamped = Math.max(BRIGHT_MIN, Math.min(BRIGHT_MAX, b));
+        long steps = Math.round((clamped - BRIGHT_MIN) / BRIGHT_STEP);
+        return BRIGHT_MIN + steps * BRIGHT_STEP;
+    }
 
-        final ImageView preview = new ImageView(ctx);
-        preview.setAdjustViewBounds(true);
-        preview.setBackgroundColor(Color.rgb(90, 140, 90));   // fondo tipo cesped para ver el alfa
-        root.addView(preview, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(ctx, 140)));
-
-        final View swatch = new View(ctx);
-        root.addView(swatch, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(ctx, 24)));
-
-        final EditText hex = new EditText(ctx);
-        hex.setSingleLine(true);
-        hex.setFilters(new InputFilter[]{new InputFilter.LengthFilter(7)});
-        hex.setHint("#RRGGBB");
-        root.addView(hex);
-
-        final SeekBar[] rgbBars = new SeekBar[3];
-        final String[] names = {"Rojo", "Verde", "Azul"};
-        for (int i = 0; i < 3; i++) {
-            TextView label = new TextView(ctx);
-            label.setText(names[i]);
-            root.addView(label);
-            rgbBars[i] = new SeekBar(ctx);
-            rgbBars[i].setMax(255);
-            root.addView(rgbBars[i]);
-        }
-        final TextView brightLabel = new TextView(ctx);
-        root.addView(brightLabel);
-        final SeekBar brightBar = new SeekBar(ctx);
-        brightBar.setMax(150);   // 0.50 .. 2.00
-        root.addView(brightBar);
-
-        LinearLayout presets = new LinearLayout(ctx);
-        presets.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout row = null;
-        for (int i = 0; i < PRESETS.length; i++) {
-            if (i % 3 == 0) {
-                row = new LinearLayout(ctx);
-                presets.addView(row);
-            }
-            Button b = new Button(ctx);
-            b.setText(PRESET_NAMES[i]);
-            b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11);
-            b.setAllCaps(false);
-            final int c = PRESETS[i];
-            b.setOnClickListener(v -> {
-                color[0] = c;
-                hex.setText(String.format("#%06X", c));
-            });
-            row.addView(b, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        }
-        root.addView(presets);
-
+    static void show(Context ctx, final byte[] ps2Bin, int rgb, double brightness, final Listener listener) {
+        final int[] color = {rgb & 0xFFFFFF};
+        final double[] bright = {snapBrightness(brightness)};
         final boolean[] updating = {false};
-        final Runnable refresh = () -> {
-            updating[0] = true;
-            for (int i = 0; i < 3; i++) {
-                rgbBars[i].setProgress((color[0] >> (16 - 8 * i)) & 0xFF);
+
+        View root = LayoutInflater.from(ctx).inflate(R.layout.dialog_color, null);
+        final ImageView preview = root.findViewById(R.id.preview);
+        final View swatch = root.findViewById(R.id.swatch);
+        final TextInputEditText hexField = root.findViewById(R.id.hex);
+        final Slider[] bars = {root.findViewById(R.id.red), root.findViewById(R.id.green), root.findViewById(R.id.blue)};
+        final Slider brightBar = root.findViewById(R.id.bright);
+        final TextView brightLabel = root.findViewById(R.id.bright_label);
+        ChipGroup presets = root.findViewById(R.id.presets);
+
+        brightBar.setValueFrom(BRIGHT_MIN);
+        brightBar.setValueTo(BRIGHT_MAX);
+        brightBar.setStepSize(BRIGHT_STEP);
+
+        final Runnable refresh = new Runnable() {
+            @Override
+            public void run() {
+                updating[0] = true;
+                for (int i = 0; i < 3; i++) {
+                    bars[i].setValue((color[0] >> (16 - 8 * i)) & 0xFF);
+                }
+                brightBar.setValue(snapBrightness(bright[0]));
+                brightLabel.setText(String.format(Locale.getDefault(), "Brillo: %.2f", bright[0]));
+                swatch.setBackgroundTintList(ColorStateList.valueOf(0xFF000000 | color[0]));
+                String h = hex(color[0]);
+                if (hexField.getText() == null || !hexField.getText().toString().equalsIgnoreCase(h)) {
+                    hexField.setText(h);
+                }
+                try {
+                    preview.setImageBitmap(bitmap(Converter.previewTexture(ps2Bin, color[0], bright[0])));
+                } catch (RuntimeException e) {
+                    preview.setImageDrawable(null);
+                }
+                updating[0] = false;
             }
-            brightBar.setProgress((int) Math.round((bright[0] - 0.5) * 100));
-            brightLabel.setText(String.format("Brillo: %.2f", bright[0]));
-            swatch.setBackgroundColor(0xFF000000 | color[0]);
-            String h = String.format("#%06X", color[0]);
-            if (!hex.getText().toString().equalsIgnoreCase(h)) {
-                hex.setText(h);
-            }
-            try {
-                byte[] tex = Converter.previewTexture(ps2Bin, color[0], bright[0]);
-                preview.setImageBitmap(bitmap(tex));
-            } catch (RuntimeException e) {
-                preview.setImageDrawable(null);
-            }
-            updating[0] = false;
         };
 
-        hex.addTextChangedListener(new TextWatcher() {
+        for (int i = 0; i < PRESETS.length; i++) {
+            final int c = PRESETS[i];
+            Chip chip = new Chip(ctx);
+            chip.setText(PRESET_NAMES[i]);
+            chip.setChipIconResource(R.drawable.circle);
+            chip.setChipIconTint(ColorStateList.valueOf(0xFF000000 | c));
+            chip.setChipIconVisible(true);
+            chip.setOnClickListener(v -> {
+                color[0] = c;
+                refresh.run();
+            });
+            presets.addView(chip);
+        }
+
+        hexField.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int a, int b, int c) {
             }
@@ -137,46 +123,34 @@ final class ColorDialog {
                 }
             }
         });
-        SeekBar.OnSeekBarChangeListener bars = new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar bar, int p, boolean fromUser) {
-                if (!fromUser || updating[0]) {
-                    return;
-                }
-                if (bar == brightBar) {
-                    bright[0] = 0.5 + p / 100.0;
-                } else {
-                    color[0] = (rgbBars[0].getProgress() << 16) | (rgbBars[1].getProgress() << 8)
-                            | rgbBars[2].getProgress();
-                }
-                refresh.run();
-            }
 
-            @Override
-            public void onStartTrackingTouch(SeekBar bar) {
+        Slider.OnChangeListener onBar = (slider, value, fromUser) -> {
+            if (!fromUser || updating[0]) {
+                return;
             }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar bar) {
+            if (slider == brightBar) {
+                bright[0] = value;
+            } else {
+                color[0] = ((int) bars[0].getValue() << 16) | ((int) bars[1].getValue() << 8) | (int) bars[2].getValue();
             }
+            refresh.run();
         };
-        for (SeekBar b : rgbBars) {
-            b.setOnSeekBarChangeListener(bars);
+        for (Slider s : bars) {
+            s.addOnChangeListener(onBar);
         }
-        brightBar.setOnSeekBarChangeListener(bars);
+        brightBar.addOnChangeListener(onBar);
         refresh.run();
 
-        ScrollView scroll = new ScrollView(ctx);
-        scroll.addView(root);
-        new AlertDialog.Builder(ctx)
-                .setTitle("Color del pelo")
-                .setView(scroll)
-                .setPositiveButton("Aceptar", (d, w) -> listener.onColor(color[0], bright[0]))
-                .setNegativeButton("Cancelar", null)
+        new MaterialAlertDialogBuilder(ctx)
+                .setTitle(R.string.hair_color)
+                .setIcon(R.drawable.ic_palette)
+                .setView(root)
+                .setPositiveButton(R.string.ok, (d, w) -> listener.onColor(color[0], bright[0]))
+                .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
-    /** Bitmap de una textura PES (escalado x4 para que se vea nitido). */
+    /** Bitmap de una textura PES, escalado x4 sin suavizado para ver los pixeles. */
     static Bitmap bitmap(byte[] tex) {
         int[] argb = Texture.toArgb(tex);
         int w = argb[0], h = argb[1];

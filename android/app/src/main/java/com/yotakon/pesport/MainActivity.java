@@ -1,25 +1,29 @@
 package com.yotakon.pesport;
 
-import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.database.Cursor;
-import android.graphics.Color;
-import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
-import android.util.TypedValue;
+import android.view.LayoutInflater;
 import android.view.View;
-import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.color.MaterialColors;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
+import com.google.android.material.snackbar.Snackbar;
 import com.yotakon.pesport.core.ConversionException;
 import com.yotakon.pesport.core.Converter;
 
@@ -29,6 +33,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -36,7 +41,7 @@ import java.util.concurrent.Executors;
  * Pantalla principal: el usuario añade .bin de caras/pelos de PES 2010 PS2, elige el color de
  * cada pelo y la carpeta de salida, y la app guarda los .bin convertidos para PES 5 Xbox.
  */
-public class MainActivity extends Activity {
+public class MainActivity extends AppCompatActivity {
     private static final int REQ_OPEN = 1;
     private static final int REQ_FOLDER = 2;
     private static final int MAX_BIN_SIZE = 8 * 1024 * 1024;
@@ -45,7 +50,6 @@ public class MainActivity extends Activity {
 
     /** Un archivo de la lista. */
     private static final class Item {
-        Uri uri;
         String name;
         byte[] data;
         Converter.Info info;
@@ -54,69 +58,39 @@ public class MainActivity extends Activity {
         double brightness = 1.0;
         String status = "";
         boolean ok;
+        boolean failed;
     }
 
     private final List<Item> items = new ArrayList<>();
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private LinearLayout list;
+    private TextView empty;
     private TextView folderText;
-    private Button convertButton;
+    private ExtendedFloatingActionButton convertButton;
+    private ExtendedFloatingActionButton addButton;
+    private LinearProgressIndicator progress;
     private Uri outputTree;
     private boolean busy;
 
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        String tree = prefs.getString("outputTree", null);
+        setContentView(R.layout.activity_main);
+        list = findViewById(R.id.list);
+        empty = findViewById(R.id.empty);
+        folderText = findViewById(R.id.folder);
+        convertButton = findViewById(R.id.convert);
+        addButton = findViewById(R.id.add);
+        progress = findViewById(R.id.progress);
+
+        String tree = getSharedPreferences(PREFS, MODE_PRIVATE).getString("outputTree", null);
         if (tree != null) {
             outputTree = Uri.parse(tree);
         }
 
-        int pad = ColorDialog.dp(this, 12);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(pad, pad, pad, pad);
-
-        TextView title = new TextView(this);
-        title.setText("Caras y pelos: PES 2010 PS2 → PES 5 Xbox");
-        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        root.addView(title);
-
-        TextView help = new TextView(this);
-        help.setText("1. Añade los .bin de cara o pelo extraídos del 0_text.afs de PES 2010.\n"
-                + "2. Elige el color de cada pelo.\n"
-                + "3. Elige la carpeta de salida y pulsa Convertir.\n"
-                + "Después inserta los .bin convertidos en el 0_text.afs de PES 5 con tu herramienta AFS.");
-        help.setPadding(0, pad / 2, 0, pad / 2);
-        root.addView(help);
-
-        Button add = new Button(this);
-        add.setText("Añadir archivos .bin");
-        add.setOnClickListener(v -> openFiles());
-        root.addView(add);
-
-        Button folder = new Button(this);
-        folder.setText("Elegir carpeta de salida");
-        folder.setOnClickListener(v -> chooseFolder());
-        root.addView(folder);
-
-        folderText = new TextView(this);
-        root.addView(folderText);
-
-        convertButton = new Button(this);
-        convertButton.setText("Convertir");
+        addButton.setOnClickListener(v -> openFiles());
         convertButton.setOnClickListener(v -> convertAll());
-        root.addView(convertButton);
-
-        list = new LinearLayout(this);
-        list.setOrientation(LinearLayout.VERTICAL);
-        root.addView(list);
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.addView(root);
-        setContentView(scroll);
+        findViewById(R.id.choose_folder).setOnClickListener(v -> chooseFolder());
         refresh();
     }
 
@@ -157,7 +131,8 @@ public class MainActivity extends Activity {
             } catch (SecurityException ignored) {
                 // sin permiso persistente: sigue valiendo durante esta sesion
             }
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString("outputTree", outputTree.toString()).apply();
+            SharedPreferences.Editor e = getSharedPreferences(PREFS, MODE_PRIVATE).edit();
+            e.putString("outputTree", outputTree.toString()).apply();
             refresh();
         } else if (req == REQ_OPEN) {
             final List<Uri> uris = new ArrayList<>();
@@ -176,12 +151,12 @@ public class MainActivity extends Activity {
         final List<Item> loaded = new ArrayList<>();
         for (Uri u : uris) {
             Item it = new Item();
-            it.uri = u;
             it.name = displayName(u);
             try {
                 it.data = readAll(u);
                 it.info = Converter.inspect(it.data);
-                it.status = it.info.kind == Converter.Kind.FACE ? "Cara" : "Pelo";
+                it.status = getString(it.info.kind == Converter.Kind.FACE ? R.string.kind_face : R.string.kind_hair)
+                        + " de PES 2010 PS2";
             } catch (ConversionException e) {
                 it.error = e.getMessage();
             } catch (IOException e) {
@@ -225,7 +200,7 @@ public class MainActivity extends Activity {
             while ((n = in.read(buf)) > 0) {
                 out.write(buf, 0, n);
                 if (out.size() > MAX_BIN_SIZE) {
-                    throw new IOException("el archivo es demasiado grande para ser una cara o un pelo");
+                    throw new IOException("es demasiado grande para ser una cara o un pelo");
                 }
             }
             return out.toByteArray();
@@ -236,13 +211,16 @@ public class MainActivity extends Activity {
 
     // ------------------------------------------------------------ conversion
 
+    private void message(int res) {
+        new MaterialAlertDialogBuilder(this).setMessage(res).setPositiveButton(R.string.ok, null).show();
+    }
+
     private void convertAll() {
         if (busy) {
             return;
         }
         if (outputTree == null) {
-            new AlertDialog.Builder(this).setMessage("Primero elige la carpeta de salida.")
-                    .setPositiveButton("Aceptar", null).show();
+            message(R.string.need_folder);
             return;
         }
         final List<Item> todo = new ArrayList<>();
@@ -252,8 +230,7 @@ public class MainActivity extends Activity {
             }
         }
         if (todo.isEmpty()) {
-            new AlertDialog.Builder(this).setMessage("No hay archivos pendientes de convertir.")
-                    .setPositiveButton("Aceptar", null).show();
+            message(R.string.nothing_to_do);
             return;
         }
         busy = true;
@@ -264,32 +241,34 @@ public class MainActivity extends Activity {
             for (final Item it : todo) {
                 try {
                     Converter.Result r = Converter.convert(it.data, it.info.needsColor ? it.rgb : null, it.brightness);
-                    String outName = outputName(it.name);
-                    String saved = save(tree, outName, r.data);
+                    String saved = save(tree, outputName(it.name), r.data);
                     it.ok = true;
-                    it.status = (r.kind == Converter.Kind.FACE ? "Cara" : "Pelo") + " convertida → " + saved;
+                    it.failed = false;
+                    it.status = "Convertido → " + saved;
                     ok++;
                 } catch (ConversionException e) {
+                    it.failed = true;
                     it.status = "Error: " + e.getMessage();
                     fail++;
                 } catch (IOException | RuntimeException e) {
+                    it.failed = true;
                     it.status = "Error al guardar: " + e.getMessage();
                     fail++;
                 }
                 runOnUiThread(this::refresh);
             }
-            final String msg = ok + " convertidos" + (fail > 0 ? ", " + fail + " con error" : "") + ".";
+            final String msg = ok + (ok == 1 ? " archivo convertido" : " archivos convertidos")
+                    + (fail > 0 ? ", " + fail + " con error" : "");
             runOnUiThread(() -> {
                 busy = false;
                 refresh();
-                new AlertDialog.Builder(this).setTitle("Terminado").setMessage(msg)
-                        .setPositiveButton("Aceptar", null).show();
+                Snackbar.make(convertButton, msg, Snackbar.LENGTH_LONG).show();
             });
         });
     }
 
     static String outputName(String in) {
-        String base = in.toLowerCase().endsWith(".bin") ? in.substring(0, in.length() - 4) : in;
+        String base = in.toLowerCase(Locale.ROOT).endsWith(".bin") ? in.substring(0, in.length() - 4) : in;
         return base + " (PES5 Xbox).bin";
     }
 
@@ -314,85 +293,94 @@ public class MainActivity extends Activity {
         } finally {
             out.close();
         }
-        String saved = displayName(doc);
-        return saved != null ? saved : name;
+        return displayName(doc);
     }
 
     // ------------------------------------------------------------ interfaz
 
     private void refresh() {
-        folderText.setText(outputTree == null ? "Carpeta de salida: (sin elegir)"
-                : "Carpeta de salida: " + folderLabel(outputTree));
+        folderText.setText(outputTree == null ? getString(R.string.output_none) : folderLabel(outputTree));
         convertButton.setEnabled(!busy);
-        convertButton.setText(busy ? "Convirtiendo…" : "Convertir");
+        addButton.setEnabled(!busy);
+        convertButton.setText(busy ? R.string.converting : R.string.convert);
+        progress.setVisibility(busy ? View.VISIBLE : View.GONE);
+        empty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
         list.removeAllViews();
-        if (items.isEmpty()) {
-            TextView empty = new TextView(this);
-            empty.setText("\nNo hay archivos. Pulsa «Añadir archivos .bin».");
-            list.addView(empty);
-        }
-        for (final Item it : items) {
-            list.addView(row(it));
+        LayoutInflater inf = LayoutInflater.from(this);
+        for (Item it : items) {
+            list.addView(row(inf, it));
         }
     }
 
     private String folderLabel(Uri tree) {
         String id = DocumentsContract.getTreeDocumentId(tree);
         int colon = id.indexOf(':');
-        return colon >= 0 ? id.substring(colon + 1) + " (" + id.substring(0, colon) + ")" : id;
+        if (colon < 0) {
+            return id;
+        }
+        String vol = id.substring(0, colon);
+        String path = id.substring(colon + 1);
+        return (vol.equals("primary") ? "Almacenamiento interno" : vol) + "/" + path;
     }
 
-    private View row(final Item it) {
-        int pad = ColorDialog.dp(this, 8);
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(pad, pad, pad, pad);
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = pad;
-        box.setLayoutParams(lp);
-        box.setBackgroundColor(it.error != null ? 0xFFFDE0E0 : it.ok ? 0xFFE0F5E0 : 0xFFF2F2F2);
+    private View row(LayoutInflater inf, final Item it) {
+        View v = inf.inflate(R.layout.item_file, list, false);
+        MaterialCardView card = v.findViewById(R.id.card);
+        ImageView icon = v.findViewById(R.id.kind_icon);
+        TextView name = v.findViewById(R.id.name);
+        TextView status = v.findViewById(R.id.status);
+        MaterialButton remove = v.findViewById(R.id.remove);
+        View colorRow = v.findViewById(R.id.color_row);
 
-        TextView name = new TextView(this);
-        name.setText(it.name);
-        name.setTypeface(Typeface.DEFAULT_BOLD);
-        box.addView(name);
-
-        TextView status = new TextView(this);
-        status.setText(it.error != null ? "No válido: " + it.error : it.status);
-        if (it.error != null) {
-            status.setTextColor(Color.rgb(160, 0, 0));
+        boolean hair = it.info != null && it.info.kind == Converter.Kind.HAIR;
+        int containerAttr, onContainerAttr;
+        if (it.error != null || it.failed) {
+            containerAttr = com.google.android.material.R.attr.colorErrorContainer;
+            onContainerAttr = com.google.android.material.R.attr.colorOnErrorContainer;
+        } else if (it.ok) {
+            containerAttr = com.google.android.material.R.attr.colorPrimaryContainer;
+            onContainerAttr = com.google.android.material.R.attr.colorOnPrimaryContainer;
+        } else {
+            containerAttr = hair ? com.google.android.material.R.attr.colorSecondaryContainer
+                    : com.google.android.material.R.attr.colorTertiaryContainer;
+            onContainerAttr = hair ? com.google.android.material.R.attr.colorOnSecondaryContainer
+                    : com.google.android.material.R.attr.colorOnTertiaryContainer;
         }
-        box.addView(status);
+        icon.setImageResource(hair ? R.drawable.ic_palette : R.drawable.ic_face);
+        icon.setBackgroundTintList(ColorStateList.valueOf(MaterialColors.getColor(icon, containerAttr)));
+        icon.setImageTintList(ColorStateList.valueOf(MaterialColors.getColor(icon, onContainerAttr)));
+        if (it.ok) {
+            card.setStrokeColor(MaterialColors.getColor(card, com.google.android.material.R.attr.colorPrimary));
+        }
 
-        LinearLayout actions = new LinearLayout(this);
-        if (it.error == null && it.info != null && it.info.needsColor) {
-            ImageView sw = new ImageView(this);
-            sw.setBackgroundColor(0xFF000000 | it.rgb);
-            int s = ColorDialog.dp(this, 32);
-            actions.addView(sw, new LinearLayout.LayoutParams(s, s));
-            Button color = new Button(this);
-            color.setText(String.format("Color #%06X · brillo %.2f", it.rgb, it.brightness));
-            color.setAllCaps(false);
+        name.setText(it.name);
+        status.setText(it.error != null ? "No válido: " + it.error : it.status);
+        if (it.error != null || it.failed) {
+            status.setTextColor(MaterialColors.getColor(status, com.google.android.material.R.attr.colorError));
+        }
+
+        boolean needsColor = it.error == null && it.info != null && it.info.needsColor;
+        colorRow.setVisibility(needsColor ? View.VISIBLE : View.GONE);
+        if (needsColor) {
+            View swatch = v.findViewById(R.id.swatch);
+            swatch.setBackgroundTintList(ColorStateList.valueOf(0xFF000000 | it.rgb));
+            MaterialButton color = v.findViewById(R.id.color);
+            color.setText(String.format(Locale.getDefault(), "%s · brillo %.2f", ColorDialog.hex(it.rgb), it.brightness));
             color.setEnabled(!busy);
-            color.setOnClickListener(v -> ColorDialog.show(this, it.data, it.rgb, it.brightness, (rgb, b) -> {
+            color.setOnClickListener(b -> ColorDialog.show(this, it.data, it.rgb, it.brightness, (rgb, br) -> {
                 it.rgb = rgb;
-                it.brightness = b;
+                it.brightness = br;
                 it.ok = false;
-                it.status = "Pelo";
+                it.failed = false;
+                it.status = getString(R.string.kind_hair) + " de PES 2010 PS2";
                 refresh();
             }));
-            actions.addView(color);
         }
-        Button remove = new Button(this);
-        remove.setText("Quitar");
         remove.setEnabled(!busy);
-        remove.setOnClickListener(v -> {
+        remove.setOnClickListener(b -> {
             items.remove(it);
             refresh();
         });
-        actions.addView(remove);
-        box.addView(actions);
-        return box;
+        return v;
     }
 }

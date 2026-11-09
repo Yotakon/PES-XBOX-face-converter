@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.PesConverter" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">#9CD786</item>
+        <item name="colorOnPrimary">#073900</item>
+        <item name="colorPrimaryContainer">#155300</item>
+        <item name="colorOnPrimaryContainer">#B7F4A0</item>
+        <item name="colorSecondary">#F5BF48</item>
+        <item name="colorOnSecondary">#402D00</item>
+        <item name="colorSecondaryContainer">#5C4200</item>
+        <item name="colorOnSecondaryContainer">#FFDF9E</item>
+        <item name="colorTertiary">#ACC7FF</item>
+        <item name="colorOnTertiary">#002F67</item>
+        <item name="colorTertiaryContainer">#11458E</item>
+        <item name="colorOnTertiaryContainer">#D7E2FF</item>
+        <item name="android:statusBarColor">@color/brand_navy</item>
+    </style>
+</resources>
