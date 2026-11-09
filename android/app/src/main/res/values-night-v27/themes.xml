@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema oscuro: iconos claros en la barra de navegacion oscura. -->
+    <style name="Theme.PesConverter" parent="Base.Theme.PesConverter">
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

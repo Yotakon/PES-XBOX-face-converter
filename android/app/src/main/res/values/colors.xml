@@ -6,6 +6,7 @@
     <color name="brand_yellow">#FFC21A</color>
     <color name="brand_navy">#0B1A33</color>
 
+    <color name="app_background">#FCFDF6</color>
     <color name="preview_grass">#5A8C5A</color>
     <color name="status_error">#B3261E</color>
 </resources>

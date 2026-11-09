@@ -153,12 +153,14 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
         android:layout_margin="16dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:gravity="end"
         android:orientation="vertical">
 
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
             android:id="@+id/add"
-            style="@style/Widget.Material3.ExtendedFloatingActionButton.Icon.Secondary"
+            style="@style/Widget.PesConverter.Fab.Secondary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="12dp"
@@ -167,7 +169,7 @@
 
         <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
             android:id="@+id/convert"
-            style="@style/Widget.Material3.ExtendedFloatingActionButton.Icon.Primary"
+            style="@style/Widget.PesConverter.Fab.Primary"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/convert"

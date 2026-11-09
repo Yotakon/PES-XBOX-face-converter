@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Botones flotantes planos: sin sombra en reposo ni al pulsar. -->
+    <style name="Widget.PesConverter.Fab.Primary" parent="Widget.Material3.ExtendedFloatingActionButton.Icon.Primary">
+        <item name="android:elevation">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <style name="Widget.PesConverter.Fab.Secondary" parent="Widget.Material3.ExtendedFloatingActionButton.Icon.Secondary">
+        <item name="android:elevation">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="elevation">0dp</item>
+    </style>
+</resources>

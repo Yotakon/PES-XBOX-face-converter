@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.PesConverter" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Base.Theme.PesConverter" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">#9CD786</item>
         <item name="colorOnPrimary">#073900</item>
         <item name="colorPrimaryContainer">#155300</item>
@@ -13,6 +13,12 @@
         <item name="colorOnTertiary">#002F67</item>
         <item name="colorTertiaryContainer">#11458E</item>
         <item name="colorOnTertiaryContainer">#D7E2FF</item>
+        <item name="android:colorBackground">@color/app_background</item>
+        <item name="colorSurface">@color/app_background</item>
+        <item name="android:windowBackground">@color/app_background</item>
         <item name="android:statusBarColor">@color/brand_navy</item>
+        <item name="android:navigationBarColor">@color/app_background</item>
     </style>
+
+    <style name="Theme.PesConverter" parent="Base.Theme.PesConverter" />
 </resources>
