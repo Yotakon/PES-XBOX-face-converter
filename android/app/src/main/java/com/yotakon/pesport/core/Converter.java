@@ -426,7 +426,7 @@ public final class Converter {
             byte[] t1 = s.get(1), t2 = s.get(2);
             if (Texture.isGrayscale(t1) || Texture.isGrayscale(t2)) {
                 if (hairRgb == null) {
-                    throw new ConversionException("El pelo esta en escala de grises: indica un color");
+                    throw new ConversionException("El HAIR esta en escala de grises: indica un color");
                 }
                 int r = (hairRgb >> 16) & 0xFF, g = (hairRgb >> 8) & 0xFF, b = hairRgb & 0xFF;
                 t1 = Texture.tint(t1, r, g, b, hairBrightness);

@@ -17,7 +17,7 @@ public final class Container {
 
     public static byte[] unpack(byte[] data) {
         if (!Bytes.startsWith(data, MAGIC)) {
-            throw new ConversionException("No es un archivo .bin de cara o pelo de PES");
+            throw new ConversionException("No es un archivo .bin de FACE o HAIR de PES");
         }
         int comp = Bytes.u32i(data, 4);
         int raw = Bytes.u32i(data, 8);

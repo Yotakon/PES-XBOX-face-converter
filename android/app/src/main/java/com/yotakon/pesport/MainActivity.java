@@ -200,7 +200,7 @@ public class MainActivity extends AppCompatActivity {
             while ((n = in.read(buf)) > 0) {
                 out.write(buf, 0, n);
                 if (out.size() > MAX_BIN_SIZE) {
-                    throw new IOException("es demasiado grande para ser una cara o un pelo");
+                    throw new IOException("es demasiado grande para ser un FACE o un HAIR");
                 }
             }
             return out.toByteArray();
