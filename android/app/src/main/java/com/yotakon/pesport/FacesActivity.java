@@ -319,16 +319,22 @@ public class FacesActivity extends AppCompatActivity {
                         }
                     }
                 }
-                final Pairs pr = f.isEmpty() || h.isEmpty() ? new Pairs()
-                        : Pairs.fromDb(players, f.get(0), h.get(0), new HashSet<>(f), new HashSet<>(h));
-                if (!players.isEmpty()) {
-                    pr.inferMissing(f, h);
+                int[] starts = null;
+                if (PlayerDb.GROUP_TABLE_ENTRY < a.count() && a.size(PlayerDb.GROUP_TABLE_ENTRY) < MAX_BIN_SIZE) {
+                    starts = PlayerDb.groupStarts(a.read(PlayerDb.GROUP_TABLE_ENTRY), f.size());
                 }
+                final boolean startsFromAfs = starts != null;
+                if (starts == null) {
+                    starts = PlayerDb.DEFAULT_GROUP_START;
+                }
+                final Pairs pr = f.isEmpty() || h.isEmpty() ? new Pairs()
+                        : Pairs.fromDb(players, f.get(0), h.get(0), starts, new HashSet<>(f), new HashSet<>(h));
                 final TreeMap<Integer, Integer> ov = loadOverrides(key, f, h);
                 pr.apply(ov);
                 final String dbLine = dbEntry == Pairs.NONE
                         ? "Base de datos de jugadores: no encontrada (todas las caras quedan Sin HAIR)"
-                        : String.format(Locale.getDefault(), "Base de datos: %d jugadores (archivo %d)", players.size(), dbEntry);
+                        : String.format(Locale.getDefault(), "Base de datos: %d jugadores (archivo %d)%s", players.size(), dbEntry,
+                        startsFromAfs ? "" : "\nGrupos de FACES: valores por defecto (archivo 505 no válido)");
                 final ParcelFileDescriptor opened = pfd;
                 runOnUiThread(() -> {
                     ParcelFileDescriptor old = afsPfd;
@@ -374,12 +380,9 @@ public class FacesActivity extends AppCompatActivity {
         }
         String s = String.format(Locale.getDefault(), "Con HAIR: %d · Sin HAIR: %d · HAIRS sin FACE: %d",
                 pairs.size(), faces.size() - pairs.size(), lone);
-        if (pairs.count(Pairs.Source.DB) > 0) {
-            s += String.format(Locale.getDefault(),
-                    "\nEn la base de datos: %d FACES (%d con HAIR)\nNo Implementado: %d FACES (%d con HAIR deducido, %d por confirmar)",
-                    pairs.count(Pairs.Source.DB), pairs.countWithHair(Pairs.Source.DB),
-                    pairs.count(Pairs.Source.DEDUCED) + pairs.count(Pairs.Source.AMBIGUOUS),
-                    pairs.countWithHair(Pairs.Source.DEDUCED), pairs.count(Pairs.Source.AMBIGUOUS));
+        if (pairs.dbCount() > 0) {
+            s += String.format(Locale.getDefault(), "\nEn la base de datos: %d FACES · No Implementado: %d FACES",
+                    pairs.dbCount(), faces.size() - pairs.dbCount());
         }
         return s;
     }
@@ -438,10 +441,8 @@ public class FacesActivity extends AppCompatActivity {
         r.faceKey = "afs:f:" + r.faceSlot;
         r.face = afsFace(afs, r.faceSlot);
         if (hair == Pairs.NONE) {
-            int options = pairs.candidates(r.faceSlot).size();
-            r.hairLabel = pairs.source(r.faceSlot) == Pairs.Source.AMBIGUOUS
-                    ? getResources().getQuantityString(R.plurals.hair_to_confirm, options, options)
-                    : getString(R.string.no_hair);
+            boolean notImplemented = pairs.dbCount() > 0 && !pairs.isInDb(r.faceSlot);
+            r.hairLabel = notImplemented ? Pairs.NOT_IMPLEMENTED : getString(R.string.no_hair);
             r.hairKey = null;
             r.hair = null;
         } else {
@@ -459,16 +460,10 @@ public class FacesActivity extends AppCompatActivity {
         final Row row = afsRows.get(position);
         final int current = pairs.hairFor(row.faceSlot);
         final Afs a = afs;
-        // Primero "Sin HAIR", luego los candidatos (si la FACE es ambigua) y después todos los HAIRS.
+        // "Sin HAIR" y después todos los HAIRS.
         final List<Integer> options = new ArrayList<>();
         options.add(Pairs.NONE);
-        final List<Integer> cands = pairs.candidates(row.faceSlot);
-        options.addAll(cands);
-        for (int hr : hairs) {
-            if (!cands.contains(hr)) {
-                options.add(hr);
-            }
-        }
+        options.addAll(hairs);
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -501,10 +496,9 @@ public class FacesActivity extends AppCompatActivity {
                 final int hair = options.get(pos);
                 ImageView iv = h.itemView.findViewById(R.id.prev);
                 TextView label = h.itemView.findViewById(R.id.label);
-                boolean cand = cands.contains(hair);
-                label.setText((hair == current ? "✓ " : cand ? "★ " : "")
+                label.setText((hair == current ? "✓ " : "")
                         + (hair == Pairs.NONE ? getString(R.string.no_hair) : String.valueOf(hair)));
-                label.setTypeface(null, hair == current || cand ? Typeface.BOLD : Typeface.NORMAL);
+                label.setTypeface(null, hair == current ? Typeface.BOLD : Typeface.NORMAL);
                 if (hair == Pairs.NONE) {
                     thumbs.load(iv, null, null);
                 } else {
@@ -529,7 +523,7 @@ public class FacesActivity extends AppCompatActivity {
                 return options.size();
             }
         });
-        int start = cands.isEmpty() && current != Pairs.NONE ? options.indexOf(current) : 0;
+        int start = current != Pairs.NONE ? options.indexOf(current) : 0;
         grid.scrollToPosition(Math.max(0, start));
 
         dialog[0] = new MaterialAlertDialogBuilder(this)
@@ -688,7 +682,7 @@ public class FacesActivity extends AppCompatActivity {
                         r.hairKey = "uri:" + hb.uri;
                         r.hair = uriSource(hb.uri, HAIR_PREVIEW);
                     } else {
-                        r.hairLabel = getString(R.string.no_hair);
+                        r.hairLabel = Pairs.NOT_IMPLEMENTED.equals(who) ? Pairs.NOT_IMPLEMENTED : getString(R.string.no_hair);
                     }
                     rows.add(r);
                 }

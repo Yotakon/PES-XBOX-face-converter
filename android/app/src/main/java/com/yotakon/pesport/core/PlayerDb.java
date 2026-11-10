@@ -22,8 +22,8 @@ import java.util.zip.Inflater;
  * <li>+100, bits 5-15: número de FACE dentro de su grupo de piel.</li>
  * <li>+102, bits 0-1: tipo de cara; 2 = FACE especial (tiene archivo en el AFS).</li>
  * </ul>
- * Las FACES del AFS están agrupadas por color de piel en el orden 3, 2, 0, 1 (comprobado con el
- * orden de los HAIRS, que sigue los mismos grupos sin ninguna inversión).
+ * Las FACES del AFS están agrupadas por color de piel en el orden 3, 2, 0, 1; el tamaño de cada
+ * grupo está en el archivo 505 ({@link #groupStarts}).
  */
 public final class PlayerDb {
     public static final int RECORD = 124;
@@ -31,13 +31,45 @@ public final class PlayerDb {
     public static final int[] AFS_ENTRIES = {32, 33};
     /** Primer peinado que es un HAIR especial (el primer archivo de HAIR del AFS). */
     public static final int FIRST_SPECIAL_HAIR = 1044;
+    /** Archivo del 0_text.afs con el número de FACES de cada grupo de piel (sección 0, u16 x4). */
+    public static final int GROUP_TABLE_ENTRY = 505;
+    /** Orden de los grupos de piel en el bloque de FACES del AFS. */
+    static final int[] GROUP_ORDER = {3, 2, 0, 1};
     /**
-     * Inicio de cada grupo de piel, contado desde el primer archivo de FACE del AFS (1527).
-     * Grupo 2: comprobado (Ronaldinho, cara 10 = archivo 1701). Grupo 3: empieza con el bloque.
-     * Grupo 0: frontera de color de las texturas en 1817 (el mismo método encuentra exacto el 1691
-     * del grupo 2). Grupo 1: justo después de la última cara del grupo 0; pendiente de confirmar.
+     * Inicio de cada grupo (índice = color de piel), contado desde el primer archivo de FACE.
+     * Valores del 0_text.afs de PES 2010 PS2 (grupos de 800, 341, 126 y 164 FACES); se usan si
+     * no se puede leer el archivo {@link #GROUP_TABLE_ENTRY}.
      */
-    static final int[] GROUP_START = {290, 1075, 164, 0};
+    public static final int[] DEFAULT_GROUP_START = {290, 1090, 164, 0};
+
+    /**
+     * Inicio de cada grupo de piel leído del archivo 505, o null si no tiene el formato esperado
+     * o los grupos no suman {@code faceCount}.
+     */
+    public static int[] groupStarts(byte[] entry505, int faceCount) {
+        try {
+            List<byte[]> secs = Container.split(Container.unpack(entry505));
+            byte[] s0 = secs.get(0);
+            int[] size = new int[4];
+            int total = 0;
+            for (int k = 0; k < 4; k++) {
+                size[k] = Bytes.u16(s0, 2 * k);
+                total += size[k];
+            }
+            if (total != faceCount) {
+                return null;
+            }
+            int[] start = new int[4];
+            int at = 0;
+            for (int g : GROUP_ORDER) {
+                start[g] = at;
+                at += size[g];
+            }
+            return start;
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
 
     public static final class Player {
         public final int index;
@@ -57,8 +89,8 @@ public final class PlayerDb {
         }
 
         /** Archivo de FACE en el AFS, o {@link Pairs#NONE} si el jugador no tiene cara especial. */
-        public int faceSlot(int firstFace) {
-            return specialFace ? firstFace + GROUP_START[skin] + faceId : Pairs.NONE;
+        public int faceSlot(int firstFace, int[] groupStart) {
+            return specialFace ? firstFace + groupStart[skin] + faceId : Pairs.NONE;
         }
 
         /** Archivo de HAIR en el AFS, o {@link Pairs#NONE} si usa un peinado genérico. */

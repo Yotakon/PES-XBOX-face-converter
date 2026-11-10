@@ -34,15 +34,9 @@ En la pantalla principal, **Caras y pelos del 0_TEXT.AFS → Abrir**:
 - **Pestaña Carpeta:** elige una carpeta con .bin extraídos; la lista (sin previas) empareja cada
   FACE con su HAIR por el nombre y, al tocar una fila, muestra arriba la previa de los dos.
 
-FACES que no están en la base de datos (por ejemplo Bergkamp) salen como «No Implementado». Su
-HAIR se deduce por el orden: en el AFS los HAIRS van en el mismo orden que sus FACES (las 819
-parejas de la base de datos no tienen ninguna inversión). Entre dos parejas conocidas, si quedan
-tantos HAIRS libres como FACES, van uno a uno; si no queda ninguno, no tienen; si quedan menos,
-la fila dice «Por confirmar» y el selector muestra primero esos HAIRS (★).
-
-Las parejas salen de la base de datos de jugadores del propio 0_TEXT.AFS (archivos 32 y 33,
-ver `PlayerDb.java`): cada jugador tiene color de piel, número de FACE dentro de su grupo de piel
-y peinado (desde 1044 = HAIR especial). En PES 2010 PS2: 910 FACES con jugador, 819 con HAIR propio.
+FACES que no están en la base de datos (por ejemplo Bergkamp) salen como «No Implementado» y sin
+HAIR: la app no deduce nada por el orden de los archivos. Los grupos de piel de las FACES tienen
+el tamaño que indica el archivo 505 del AFS (800, 341, 126 y 164 en PES 2010 PS2), en el orden 3, 2, 0, 1.
 
 ## Qué hace la conversión
 
