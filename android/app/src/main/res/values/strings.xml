@@ -24,8 +24,8 @@
     <string name="nothing_to_do">No hay archivos pendientes de convertir.</string>
     <string name="help">Después inserta los archivos «(PES5 Xbox).bin» en el 0_text.afs de PES 5 con tu herramienta AFS.</string>
 
-    <!-- Pantalla de caras y pelos del 0_TEXT.AFS -->
-    <string name="open_faces">Caras y pelos del 0_TEXT.AFS</string>
+    <!-- Pantalla de FACES y HAIRS del 0_TEXT.AFS -->
+    <string name="open_faces">FACES y HAIRS del 0_TEXT.AFS</string>
     <string name="open_faces_desc">Busca las FACES con su HAIR, extráelas y mira sus previas.</string>
     <string name="open">Abrir</string>
     <string name="faces_title">FACES y HAIRS</string>
@@ -43,14 +43,14 @@
     <string name="pick_hint">El HAIR de cada FACE sale de la base de datos de jugadores (ID de FACE → ID de HAIR). Las FACES que no están en ella quedan «No Implementado». Toca una fila para cambiarlo. Se extraen como «1701 FACE - RONALDINHO.bin» y «1701 HAIR (slot 4593) - RONALDINHO.bin».</string>
     <string name="bins_folder">Carpeta con los .bin extraídos</string>
     <string name="bins_empty">Elige la carpeta con los .bin para ver la lista. Toca una fila para ver su previa.</string>
-    <string name="col_face">Cara</string>
-    <string name="col_hair">Pelo</string>
+    <string name="col_face">FACE</string>
+    <string name="col_hair">HAIR</string>
     <string name="col_prev">Previa</string>
-    <string name="col_face_prev">Previa de la cara</string>
-    <string name="col_hair_prev">Previa del pelo</string>
+    <string name="col_face_prev">Previa de la FACE</string>
+    <string name="col_hair_prev">Previa del HAIR</string>
     <string name="no_hair">Sin HAIR</string>
     <string name="no_face">Sin FACE</string>
-    <string name="pick_hair">HAIR de la cara %1$s</string>
+    <string name="pick_hair">HAIR de la FACE %1$s</string>
     <string name="need_afs">Primero busca el 0_TEXT.AFS.</string>
     <string name="need_extract_folder">Primero elige la carpeta donde extraer.</string>
 </resources>

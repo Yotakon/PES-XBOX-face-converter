@@ -24,11 +24,11 @@ Descarga del APK de prueba (última compilación de la rama `app-android`):
 
 ## Caras y pelos del 0_TEXT.AFS
 
-En la pantalla principal, **Caras y pelos del 0_TEXT.AFS → Abrir**:
+En la pantalla principal, **FACES y HAIRS del 0_TEXT.AFS → Abrir**:
 
 - **Pestaña 0_TEXT.AFS:** **Buscar** el AFS. El registro muestra cuántas FACES y HAIRS tiene
   (en PES 2010 PS2: 1431 FACES en los archivos 1527–2957 y 1147 HAIRS en 4468–5614). La lista
-  muestra Cara (con el jugador) | Pelo | Previa | Previa; toca una fila para cambiar su HAIR.
+  muestra FACE (con el jugador) | HAIR | Previa | Previa; toca una fila para cambiar su HAIR.
   **Extraer y renombrar** guarda en la carpeta elegida `1701 FACE - RONALDINHO.bin`,
   `1701 HAIR (slot 4593) - RONALDINHO.bin` y los HAIRS sin FACE como `HAIR 4600 (sin FACE).bin`.
 - **Pestaña Carpeta:** elige una carpeta con .bin extraídos; la lista (sin previas) empareja cada

@@ -510,7 +510,7 @@ public class FacesActivity extends AppCompatActivity {
                     saveOverrides();
                     fillAfsRow(row);
                     afsAdapter.notifyItemChanged(position);
-                    log("Cara " + row.faceSlot + " → " + (hair == Pairs.NONE ? getString(R.string.no_hair) : "HAIR " + hair));
+                    log("FACE " + row.faceSlot + " → " + (hair == Pairs.NONE ? getString(R.string.no_hair) : "HAIR " + hair));
                     log(pairSummary());
                     if (dialog[0] != null) {
                         dialog[0].dismiss();
@@ -825,7 +825,8 @@ public class FacesActivity extends AppCompatActivity {
     private void showPreview(int position) {
         Row r = binRows.get(position);
         prevFaceLabel.setText(getString(R.string.col_face) + " " + r.faceLabel);
-        prevHairLabel.setText(getString(R.string.col_hair) + " " + r.hairLabel);
+        // Con HAIR: "HAIR 4469"; sin HAIR se muestra solo "Sin HAIR" o "No Implementado".
+        prevHairLabel.setText(r.hair != null ? getString(R.string.col_hair) + " " + r.hairLabel : r.hairLabel);
         thumbs.load(prevFace, r.faceKey, r.face);
         thumbs.load(prevHair, r.hairKey, r.hair);
         binsAdapter.select(position);
