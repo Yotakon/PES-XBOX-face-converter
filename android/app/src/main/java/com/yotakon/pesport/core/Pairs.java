@@ -22,8 +22,25 @@ public final class Pairs {
     private static final Pattern LONE_HAIR_NAME = Pattern.compile("^HAIR (\\d+) \\(sin FACE\\)\\.bin$", Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMBER = Pattern.compile("(\\d+)");
 
+    /** De dónde sale el HAIR de una FACE. */
+    public enum Source {
+        /** De la base de datos de jugadores (con HAIR propio o genérico). */
+        DB,
+        /** FACE fuera de la base de datos: HAIR deducido por el orden de los archivos. */
+        DEDUCED,
+        /** FACE fuera de la base de datos y hay menos HAIRS libres que FACES: hay que elegirlo. */
+        AMBIGUOUS,
+        /** Elegido a mano. */
+        MANUAL
+    }
+
+    /** Nombre que se muestra para una FACE que no está en la base de datos. */
+    public static final String NOT_IMPLEMENTED = "No Implementado";
+
     private final TreeMap<Integer, Integer> map = new TreeMap<>();
     private final TreeMap<Integer, List<String>> names = new TreeMap<>();
+    private final TreeMap<Integer, Source> sources = new TreeMap<>();
+    private final TreeMap<Integer, List<Integer>> candidates = new TreeMap<>();
 
     /**
      * Parejas de la base de datos: cada jugador con FACE especial da FACE → su HAIR especial, o
@@ -38,12 +55,97 @@ public final class Pairs {
                 continue;
             }
             p.addName(face, pl.name);
+            p.sources.put(face, Source.DB);
             int hair = pl.hairSlot(firstHair);
             if (hair != NONE && hairs.contains(hair) && !p.has(face)) {
                 p.set(face, hair);
             }
         }
         return p;
+    }
+
+    /**
+     * Deduce el HAIR de las FACES que no están en la base de datos. En el AFS los HAIRS van en el
+     * mismo orden que sus FACES (en PES 2010 PS2: 819 parejas de la base de datos sin ninguna
+     * inversión, y nunca hay más HAIRS que FACES entre dos parejas). Entre dos parejas conocidas,
+     * si hay tantos HAIRS libres como FACES sin jugador, van uno a uno en orden; si no hay HAIRS,
+     * esas FACES no tienen; si hay menos, quedan {@link Source#AMBIGUOUS} con los candidatos.
+     *
+     * @param faces números de FACE del AFS, ordenados
+     * @param hairs números de HAIR del AFS, ordenados
+     */
+    public void inferMissing(List<Integer> faces, List<Integer> hairs) {
+        List<int[]> anchors = new ArrayList<>();
+        anchors.add(new int[]{-1, -1});
+        int lastHair = -1;
+        for (int fi = 0; fi < faces.size(); fi++) {
+            int face = faces.get(fi);
+            if (sources.get(face) != Source.DB || !has(face)) {
+                continue;
+            }
+            int hi = Collections.binarySearch(hairs, hairFor(face));
+            if (hi <= lastHair) {
+                continue;  // fuera de orden: no sirve de referencia
+            }
+            anchors.add(new int[]{fi, hi});
+            lastHair = hi;
+        }
+        anchors.add(new int[]{faces.size(), hairs.size()});
+        for (int a = 0; a + 1 < anchors.size(); a++) {
+            int[] from = anchors.get(a), to = anchors.get(a + 1);
+            List<Integer> open = new ArrayList<>();
+            for (int fi = from[0] + 1; fi < to[0]; fi++) {
+                if (!sources.containsKey(faces.get(fi))) {
+                    open.add(faces.get(fi));
+                }
+            }
+            List<Integer> free = new ArrayList<>(hairs.subList(from[1] + 1, to[1]));
+            for (int k = 0; k < open.size(); k++) {
+                int face = open.get(k);
+                if (free.size() == open.size()) {
+                    set(face, free.get(k));
+                    sources.put(face, Source.DEDUCED);
+                } else if (free.isEmpty()) {
+                    sources.put(face, Source.DEDUCED);
+                } else {
+                    sources.put(face, Source.AMBIGUOUS);
+                    candidates.put(face, free);
+                }
+            }
+        }
+    }
+
+    /** Origen del HAIR de esta FACE (null si no se sabe nada). */
+    public Source source(int face) {
+        return sources.get(face);
+    }
+
+    /** HAIRS posibles de una FACE {@link Source#AMBIGUOUS} (vacío si no es ambigua). */
+    public List<Integer> candidates(int face) {
+        List<Integer> l = candidates.get(face);
+        return l == null ? Collections.<Integer>emptyList() : l;
+    }
+
+    /** Cuántas FACES tienen este origen. */
+    public int count(Source s) {
+        int n = 0;
+        for (Source v : sources.values()) {
+            if (v == s) {
+                n++;
+            }
+        }
+        return n;
+    }
+
+    /** Cuántas FACES con este origen tienen HAIR. */
+    public int countWithHair(Source s) {
+        int n = 0;
+        for (Map.Entry<Integer, Source> e : sources.entrySet()) {
+            if (e.getValue() == s && has(e.getKey())) {
+                n++;
+            }
+        }
+        return n;
     }
 
     /** Número de HAIR de un FACE, o {@link #NONE}. */
@@ -102,7 +204,10 @@ public final class Pairs {
         return l == null ? Collections.<String>emptyList() : l;
     }
 
-    /** Nombres separados por " / ", o "" si no hay. */
+    /**
+     * Jugadores separados por " / "; {@link #NOT_IMPLEMENTED} si la FACE no está en la base de
+     * datos; "" si no se cargó ninguna base de datos.
+     */
     public String label(int face) {
         StringBuilder sb = new StringBuilder();
         for (String n : names(face)) {
@@ -111,13 +216,18 @@ public final class Pairs {
             }
             sb.append(n);
         }
+        if (sb.length() == 0 && !sources.isEmpty() && sources.get(face) != Source.DB) {
+            return NOT_IMPLEMENTED;
+        }
         return sb.toString();
     }
 
-    /** Copia con las mismas parejas y nombres. */
+    /** Copia con las mismas parejas, nombres y orígenes. */
     public Pairs copy() {
         Pairs p = new Pairs();
         p.map.putAll(map);
+        p.sources.putAll(sources);
+        p.candidates.putAll(candidates);
         for (Map.Entry<Integer, List<String>> e : names.entrySet()) {
             p.names.put(e.getKey(), new ArrayList<>(e.getValue()));
         }
@@ -129,8 +239,17 @@ public final class Pairs {
     /** Aplica los cambios del usuario ({@link #NONE} = "Sin HAIR"). */
     public void apply(Map<Integer, Integer> overrides) {
         for (Map.Entry<Integer, Integer> e : overrides.entrySet()) {
-            set(e.getKey(), e.getValue());
+            setManual(e.getKey(), e.getValue());
         }
+    }
+
+    /** Cambio a mano: la FACE deja de ser deducida o ambigua. */
+    public void setManual(int face, int hair) {
+        set(face, hair);
+        if (sources.get(face) != Source.DB) {
+            sources.put(face, Source.MANUAL);
+        }
+        candidates.remove(face);
     }
 
     /** Una línea "FACE=HAIR" por cambio; HAIR = -1 es "Sin HAIR". */

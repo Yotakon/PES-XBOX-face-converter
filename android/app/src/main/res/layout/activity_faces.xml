@@ -357,7 +357,9 @@
                     android:layout_height="match_parent"
                     android:orientation="vertical">
 
-                    <include layout="@layout/header_pair" />
+                    <include
+                        android:id="@+id/bins_header"
+                        layout="@layout/header_pair" />
 
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/bins_list"

@@ -141,7 +141,7 @@ public class FacesActivity extends AppCompatActivity {
         findViewById(R.id.pick_afs).setOnClickListener(v -> pickAfs());
         findViewById(R.id.pick_extract).setOnClickListener(v -> pickTree(REQ_EXTRACT));
         extractButton.setOnClickListener(v -> extractAll());
-        afsAdapter = new PairAdapter(afsRows, this::pickHairFor);
+        afsAdapter = new PairAdapter(afsRows, this::pickHairFor, true);
         setupList(findViewById(R.id.afs_list), afsAdapter);
 
         binsFolder = findViewById(R.id.bins_folder);
@@ -151,7 +151,11 @@ public class FacesActivity extends AppCompatActivity {
         prevFaceLabel = findViewById(R.id.prev_face_label);
         prevHairLabel = findViewById(R.id.prev_hair_label);
         findViewById(R.id.pick_bins).setOnClickListener(v -> pickTree(REQ_BINS));
-        binsAdapter = new PairAdapter(binRows, this::showPreview);
+        binsAdapter = new PairAdapter(binRows, this::showPreview, false);
+        // En la pestaña Carpeta la previa va arriba: la lista no lleva columnas de previa.
+        View binsHeader = findViewById(R.id.bins_header);
+        binsHeader.findViewById(R.id.head_prev_face).setVisibility(View.GONE);
+        binsHeader.findViewById(R.id.head_prev_hair).setVisibility(View.GONE);
         setupList(findViewById(R.id.bins_list), binsAdapter);
 
         SharedPreferences p = prefs();
@@ -317,6 +321,9 @@ public class FacesActivity extends AppCompatActivity {
                 }
                 final Pairs pr = f.isEmpty() || h.isEmpty() ? new Pairs()
                         : Pairs.fromDb(players, f.get(0), h.get(0), new HashSet<>(f), new HashSet<>(h));
+                if (!players.isEmpty()) {
+                    pr.inferMissing(f, h);
+                }
                 final TreeMap<Integer, Integer> ov = loadOverrides(key, f, h);
                 pr.apply(ov);
                 final String dbLine = dbEntry == Pairs.NONE
@@ -365,8 +372,16 @@ public class FacesActivity extends AppCompatActivity {
                 lone++;
             }
         }
-        return String.format(Locale.getDefault(), "Con HAIR: %d · Sin HAIR: %d · HAIRS sin FACE: %d",
+        String s = String.format(Locale.getDefault(), "Con HAIR: %d · Sin HAIR: %d · HAIRS sin FACE: %d",
                 pairs.size(), faces.size() - pairs.size(), lone);
+        if (pairs.count(Pairs.Source.DB) > 0) {
+            s += String.format(Locale.getDefault(),
+                    "\nEn la base de datos: %d FACES (%d con HAIR)\nNo Implementado: %d FACES (%d con HAIR deducido, %d por confirmar)",
+                    pairs.count(Pairs.Source.DB), pairs.countWithHair(Pairs.Source.DB),
+                    pairs.count(Pairs.Source.DEDUCED) + pairs.count(Pairs.Source.AMBIGUOUS),
+                    pairs.countWithHair(Pairs.Source.DEDUCED), pairs.count(Pairs.Source.AMBIGUOUS));
+        }
+        return s;
     }
 
     /** Cambios hechos a mano para este AFS (solo los que siguen siendo FACE/HAIR válidos). */
@@ -423,7 +438,10 @@ public class FacesActivity extends AppCompatActivity {
         r.faceKey = "afs:f:" + r.faceSlot;
         r.face = afsFace(afs, r.faceSlot);
         if (hair == Pairs.NONE) {
-            r.hairLabel = getString(R.string.no_hair);
+            int options = pairs.candidates(r.faceSlot).size();
+            r.hairLabel = pairs.source(r.faceSlot) == Pairs.Source.AMBIGUOUS
+                    ? getResources().getQuantityString(R.plurals.hair_to_confirm, options, options)
+                    : getString(R.string.no_hair);
             r.hairKey = null;
             r.hair = null;
         } else {
@@ -441,6 +459,16 @@ public class FacesActivity extends AppCompatActivity {
         final Row row = afsRows.get(position);
         final int current = pairs.hairFor(row.faceSlot);
         final Afs a = afs;
+        // Primero "Sin HAIR", luego los candidatos (si la FACE es ambigua) y después todos los HAIRS.
+        final List<Integer> options = new ArrayList<>();
+        options.add(Pairs.NONE);
+        final List<Integer> cands = pairs.candidates(row.faceSlot);
+        options.addAll(cands);
+        for (int hr : hairs) {
+            if (!cands.contains(hr)) {
+                options.add(hr);
+            }
+        }
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -470,18 +498,20 @@ public class FacesActivity extends AppCompatActivity {
 
             @Override
             public void onBindViewHolder(@NonNull RecyclerView.ViewHolder h, int pos) {
-                final int hair = pos == 0 ? Pairs.NONE : hairs.get(pos - 1);
+                final int hair = options.get(pos);
                 ImageView iv = h.itemView.findViewById(R.id.prev);
                 TextView label = h.itemView.findViewById(R.id.label);
-                label.setText((hair == current ? "✓ " : "") + (hair == Pairs.NONE ? getString(R.string.no_hair) : String.valueOf(hair)));
-                label.setTypeface(null, hair == current ? Typeface.BOLD : Typeface.NORMAL);
+                boolean cand = cands.contains(hair);
+                label.setText((hair == current ? "✓ " : cand ? "★ " : "")
+                        + (hair == Pairs.NONE ? getString(R.string.no_hair) : String.valueOf(hair)));
+                label.setTypeface(null, hair == current || cand ? Typeface.BOLD : Typeface.NORMAL);
                 if (hair == Pairs.NONE) {
                     thumbs.load(iv, null, null);
                 } else {
                     thumbs.load(iv, "afs:h:" + hair, afsHair(a, hair));
                 }
                 h.itemView.setOnClickListener(v -> {
-                    pairs.set(row.faceSlot, hair);
+                    pairs.setManual(row.faceSlot, hair);
                     overrides.put(row.faceSlot, hair);
                     saveOverrides();
                     fillAfsRow(row);
@@ -496,10 +526,10 @@ public class FacesActivity extends AppCompatActivity {
 
             @Override
             public int getItemCount() {
-                return hairs.size() + 1;
+                return options.size();
             }
         });
-        int start = current == Pairs.NONE ? 0 : Collections.binarySearch(hairs, current) + 1;
+        int start = cands.isEmpty() && current != Pairs.NONE ? options.indexOf(current) : 0;
         grid.scrollToPosition(Math.max(0, start));
 
         dialog[0] = new MaterialAlertDialogBuilder(this)
@@ -643,6 +673,10 @@ public class FacesActivity extends AppCompatActivity {
                     Row r = new Row();
                     String who = !fb.parsed.player.isEmpty() ? fb.parsed.player
                             : id != Pairs.NONE ? known.label(id) : "";
+                    if (who.isEmpty() && fb.parsed.ours) {
+                        // esta app pone el jugador en el nombre; si no lo lleva, no está en la base de datos
+                        who = Pairs.NOT_IMPLEMENTED;
+                    }
                     r.faceLabel = id == Pairs.NONE ? fb.name : who.isEmpty() ? String.valueOf(id) : id + "\n" + who;
                     r.faceKey = "uri:" + fb.uri;
                     r.face = uriSource(fb.uri, null);
@@ -707,41 +741,87 @@ public class FacesActivity extends AppCompatActivity {
         Uri children = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree));
         String[] cols = {DocumentsContract.Document.COLUMN_DOCUMENT_ID, DocumentsContract.Document.COLUMN_DISPLAY_NAME,
                 DocumentsContract.Document.COLUMN_MIME_TYPE, DocumentsContract.Document.COLUMN_SIZE};
-        List<BinFile> out = new ArrayList<>();
-        Cursor c = cr.query(children, cols, null, null, null);
-        if (c == null) {
-            throw new IOException("no se pudo leer la carpeta");
-        }
-        try {
-            while (c.moveToNext()) {
-                String name = c.getString(1);
-                String mime = c.getString(2);
-                long size = c.isNull(3) ? 0 : c.getLong(3);
-                if (name == null || DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)
-                        || !name.toLowerCase(Locale.ROOT).endsWith(".bin") || size > MAX_BIN_SIZE) {
-                    continue;
+        // Primero solo la lista de nombres (rápido); los archivos se abren después y solo si hace falta.
+        List<String[]> entries = new ArrayList<>();
+        String reason = null;
+        for (int attempt = 0; attempt < 3 && entries.isEmpty(); attempt++) {
+            Cursor c;
+            try {
+                c = cr.query(children, cols, null, null, null);
+            } catch (RuntimeException e) {
+                c = null;
+                reason = e.getMessage();
+            }
+            if (c == null) {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
                 }
-                Uri doc = DocumentsContract.buildDocumentUriUsingTree(tree, c.getString(0));
-                FaceHair.Kind kind;
+                continue;
+            }
+            try {
+                while (c.moveToNext()) {
+                    String name = c.getString(1);
+                    String mime = c.getString(2);
+                    long size = c.isNull(3) ? 0 : c.getLong(3);
+                    if (name == null || DocumentsContract.Document.MIME_TYPE_DIR.equals(mime)
+                            || !name.toLowerCase(Locale.ROOT).endsWith(".bin") || size > MAX_BIN_SIZE) {
+                        continue;
+                    }
+                    entries.add(new String[]{c.getString(0), name});
+                }
+                reason = null;
+                break;
+            } finally {
+                c.close();
+            }
+        }
+        if (reason != null || (entries.isEmpty() && !canList(cr, children))) {
+            throw new IOException("no se pudo leer la carpeta"
+                    + (reason != null ? " (" + reason + ")" : "") + ". Vuelve a pulsar Elegir y selecciónala de nuevo.");
+        }
+        List<BinFile> out = new ArrayList<>();
+        for (String[] e : entries) {
+            Uri doc = DocumentsContract.buildDocumentUriUsingTree(tree, e[0]);
+            Pairs.Name parsed = Pairs.parseName(e[1]);
+            FaceHair.Kind kind;
+            if (parsed.ours) {
+                // nombres de esta app: el tipo se sabe por el nombre
+                kind = parsed.face != Pairs.NONE && parsed.hair == Pairs.NONE ? FaceHair.Kind.FACE : FaceHair.Kind.HAIR;
+            } else {
                 try {
                     kind = FaceHair.classify(read(doc, FaceHair.HEAD_BYTES));
-                } catch (IOException e) {
+                } catch (IOException ex) {
                     kind = null;
                 }
-                if (kind == null) {
-                    continue;
-                }
-                BinFile b = new BinFile();
-                b.name = name;
-                b.uri = doc;
-                b.parsed = Pairs.parseName(name);
-                b.kind = kind;
-                out.add(b);
             }
-        } finally {
-            c.close();
+            if (kind == null) {
+                continue;
+            }
+            BinFile b = new BinFile();
+            b.name = e[1];
+            b.uri = doc;
+            b.parsed = parsed;
+            b.kind = kind;
+            out.add(b);
         }
         return out;
+    }
+
+    /** true si la carpeta se puede consultar (aunque esté vacía). */
+    private static boolean canList(ContentResolver cr, Uri children) {
+        try {
+            Cursor c = cr.query(children, new String[]{DocumentsContract.Document.COLUMN_DOCUMENT_ID}, null, null, null);
+            if (c == null) {
+                return false;
+            }
+            c.close();
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     private Thumbs.Source uriSource(final Uri u, final Integer tint) {
@@ -813,9 +893,12 @@ public class FacesActivity extends AppCompatActivity {
         private final OnRow onRow;
         private int selected = RecyclerView.NO_POSITION;
 
-        PairAdapter(List<Row> rows, OnRow onRow) {
+        private final boolean previews;
+
+        PairAdapter(List<Row> rows, OnRow onRow, boolean previews) {
             this.rows = rows;
             this.onRow = onRow;
+            this.previews = previews;
         }
 
         final class Holder extends RecyclerView.ViewHolder {
@@ -857,8 +940,12 @@ public class FacesActivity extends AppCompatActivity {
                     ? com.google.android.material.color.MaterialColors.getColor(h.itemView,
                     com.google.android.material.R.attr.colorSecondaryContainer)
                     : 0);
-            thumbs.load(h.facePrev, r.faceKey, r.face);
-            thumbs.load(h.hairPrev, r.hairKey, r.hair);
+            h.facePrev.setVisibility(previews ? View.VISIBLE : View.GONE);
+            h.hairPrev.setVisibility(previews ? View.VISIBLE : View.GONE);
+            if (previews) {
+                thumbs.load(h.facePrev, r.faceKey, r.face);
+                thumbs.load(h.hairPrev, r.hairKey, r.hair);
+            }
             h.itemView.setOnClickListener(v -> {
                 int p = h.getBindingAdapterPosition();
                 if (p != RecyclerView.NO_POSITION) {

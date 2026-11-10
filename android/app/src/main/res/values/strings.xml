@@ -31,7 +31,11 @@
     <string name="faces_title">FACES y HAIRS</string>
     <string name="faces_subtitle">0_TEXT.AFS de PES 2010 PS2</string>
     <string name="tab_afs">0_TEXT.AFS</string>
-    <string name="tab_folder">Carpeta .bin</string>
+    <string name="tab_folder">Carpeta</string>
+    <plurals name="hair_to_confirm">
+        <item quantity="one">Por confirmar (%d opción)</item>
+        <item quantity="other">Por confirmar (%d opciones)</item>
+    </plurals>
     <string name="afs_file">Archivo 0_TEXT.AFS</string>
     <string name="search">Buscar</string>
     <string name="none_chosen">Sin elegir</string>
@@ -40,7 +44,7 @@
     <string name="extract_folder">Carpeta donde extraer</string>
     <string name="extract">Extraer y renombrar</string>
     <string name="extracting">Extrayendo…</string>
-    <string name="pick_hint">El HAIR de cada FACE sale de la base de datos de jugadores del AFS. Toca una fila para cambiarlo. Se extraen como «1701 FACE - RONALDINHO.bin» y «1701 HAIR (slot 4593) - RONALDINHO.bin».</string>
+    <string name="pick_hint">El HAIR sale de la base de datos de jugadores; para las FACES «No Implementado» se deduce por el orden de los archivos. Toca una fila para cambiarlo (★ = candidatos). Se extraen como «1701 FACE - RONALDINHO.bin» y «1701 HAIR (slot 4593) - RONALDINHO.bin».</string>
     <string name="bins_folder">Carpeta con los .bin extraídos</string>
     <string name="bins_empty">Elige la carpeta con los .bin para ver la lista. Toca una fila para ver su previa.</string>
     <string name="col_face">Cara</string>

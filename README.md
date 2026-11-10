@@ -31,8 +31,14 @@ En la pantalla principal, **Caras y pelos del 0_TEXT.AFS → Abrir**:
   muestra Cara (con el jugador) | Pelo | Previa | Previa; toca una fila para cambiar su HAIR.
   **Extraer y renombrar** guarda en la carpeta elegida `1701 FACE - RONALDINHO.bin`,
   `1701 HAIR (slot 4593) - RONALDINHO.bin` y los HAIRS sin FACE como `HAIR 4600 (sin FACE).bin`.
-- **Pestaña Carpeta .bin:** elige una carpeta con .bin extraídos; la lista empareja cada FACE con
-  su HAIR por el nombre y, al tocar una fila, muestra arriba la previa de los dos.
+- **Pestaña Carpeta:** elige una carpeta con .bin extraídos; la lista (sin previas) empareja cada
+  FACE con su HAIR por el nombre y, al tocar una fila, muestra arriba la previa de los dos.
+
+FACES que no están en la base de datos (por ejemplo Bergkamp) salen como «No Implementado». Su
+HAIR se deduce por el orden: en el AFS los HAIRS van en el mismo orden que sus FACES (las 819
+parejas de la base de datos no tienen ninguna inversión). Entre dos parejas conocidas, si quedan
+tantos HAIRS libres como FACES, van uno a uno; si no queda ninguno, no tienen; si quedan menos,
+la fila dice «Por confirmar» y el selector muestra primero esos HAIRS (★).
 
 Las parejas salen de la base de datos de jugadores del propio 0_TEXT.AFS (archivos 32 y 33,
 ver `PlayerDb.java`): cada jugador tiene color de piel, número de FACE dentro de su grupo de piel

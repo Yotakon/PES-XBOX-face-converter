@@ -25,6 +25,7 @@
         android:textAppearance="?attr/textAppearanceLabelLarge" />
 
     <TextView
+        android:id="@+id/head_prev_face"
         android:layout_width="56dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
@@ -33,6 +34,7 @@
         android:textAppearance="?attr/textAppearanceLabelLarge" />
 
     <TextView
+        android:id="@+id/head_prev_hair"
         android:layout_width="96dp"
         android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
