@@ -35,6 +35,7 @@ import com.yotakon.pesport.core.Afs;
 import com.yotakon.pesport.core.Converter;
 import com.yotakon.pesport.core.FaceHair;
 import com.yotakon.pesport.core.Pairs;
+import com.yotakon.pesport.core.PlayerDb;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
@@ -49,6 +50,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -90,7 +92,8 @@ public class FacesActivity extends AppCompatActivity {
     private List<Integer> faces = new ArrayList<>();
     private List<Integer> hairs = new ArrayList<>();
     private Pairs pairs = new Pairs();
-    private String pairsKey;
+    private TreeMap<Integer, Integer> overrides = new TreeMap<>();
+    private String overridesKey;
     private Uri extractTree;
 
     // pestaña 2
@@ -300,8 +303,25 @@ public class FacesActivity extends AppCompatActivity {
                         log("Revisados " + (i + 1) + " de " + a.count() + "…");
                     }
                 }
-                final String key = "pairs_" + a.count() + "_" + size;
-                final Pairs pr = loadPairs(key, f, h);
+                final String key = "overrides_" + a.count() + "_" + size;
+                List<PlayerDb.Player> players = new ArrayList<>();
+                int dbEntry = Pairs.NONE;
+                for (int e : PlayerDb.AFS_ENTRIES) {
+                    if (e < a.count() && a.size(e) > 0 && a.size(e) < MAX_BIN_SIZE) {
+                        players = PlayerDb.read(a.read(e));
+                        if (!players.isEmpty()) {
+                            dbEntry = e;
+                            break;
+                        }
+                    }
+                }
+                final Pairs pr = f.isEmpty() || h.isEmpty() ? new Pairs()
+                        : Pairs.fromDb(players, f.get(0), h.get(0), new HashSet<>(f), new HashSet<>(h));
+                final TreeMap<Integer, Integer> ov = loadOverrides(key, f, h);
+                pr.apply(ov);
+                final String dbLine = dbEntry == Pairs.NONE
+                        ? "Base de datos de jugadores: no encontrada (todas las caras quedan Sin HAIR)"
+                        : String.format(Locale.getDefault(), "Base de datos: %d jugadores (archivo %d)", players.size(), dbEntry);
                 final ParcelFileDescriptor opened = pfd;
                 runOnUiThread(() -> {
                     ParcelFileDescriptor old = afsPfd;
@@ -310,13 +330,14 @@ public class FacesActivity extends AppCompatActivity {
                     faces = f;
                     hairs = h;
                     pairs = pr;
-                    pairsKey = key;
-                    prefs().edit().putString("pairs_last", key).apply();
+                    overrides = ov;
+                    overridesKey = key;
                     thumbs.clear();
                     closeAfs(old);
                     buildAfsRows();
-                    logClear(String.format(Locale.getDefault(), "Archivos en el AFS: %d\n%s\n%s\n%s",
-                            a.count(), range("FACES", f), range("HAIRS", h), pairSummary()));
+                    logClear(String.format(Locale.getDefault(), "Archivos en el AFS: %d\n%s\n%s\n%s\n%s%s",
+                            a.count(), range("FACES", f), range("HAIRS", h), dbLine, pairSummary(),
+                            ov.isEmpty() ? "" : "\nCambios a mano: " + ov.size()));
                     setBusy(false);
                 });
             } catch (Exception e) {
@@ -348,28 +369,21 @@ public class FacesActivity extends AppCompatActivity {
                 pairs.size(), faces.size() - pairs.size(), lone);
     }
 
-    /** Parejas guardadas para este AFS (solo las que siguen siendo FACE/HAIR) + las conocidas. */
-    private Pairs loadPairs(String key, List<Integer> f, List<Integer> h) {
+    /** Cambios hechos a mano para este AFS (solo los que siguen siendo FACE/HAIR válidos). */
+    private TreeMap<Integer, Integer> loadOverrides(String key, List<Integer> f, List<Integer> h) {
         Set<Integer> fs = new HashSet<>(f), hs = new HashSet<>(h);
-        Pairs stored = Pairs.parse(prefs().getString(key, null));
-        Pairs out = new Pairs();
-        for (int face : f) {
-            int hair = stored.hairFor(face);
-            if (hair != Pairs.NONE && hs.contains(hair)) {
-                out.set(face, hair);
-            }
-        }
-        for (int[] k : Pairs.KNOWN) {
-            if (fs.contains(k[0]) && hs.contains(k[1]) && !out.has(k[0])) {
-                out.set(k[0], k[1]);
+        TreeMap<Integer, Integer> out = new TreeMap<>();
+        for (Map.Entry<Integer, Integer> e : Pairs.parseOverrides(prefs().getString(key, null)).entrySet()) {
+            if (fs.contains(e.getKey()) && (e.getValue() == Pairs.NONE || hs.contains(e.getValue()))) {
+                out.put(e.getKey(), e.getValue());
             }
         }
         return out;
     }
 
-    private void savePairs() {
-        if (pairsKey != null) {
-            prefs().edit().putString(pairsKey, pairs.serialize()).apply();
+    private void saveOverrides() {
+        if (overridesKey != null) {
+            prefs().edit().putString(overridesKey, Pairs.serializeOverrides(overrides)).apply();
         }
     }
 
@@ -404,7 +418,8 @@ public class FacesActivity extends AppCompatActivity {
 
     private void fillAfsRow(Row r) {
         int hair = pairs.hairFor(r.faceSlot);
-        r.faceLabel = String.valueOf(r.faceSlot);
+        String who = pairs.label(r.faceSlot);
+        r.faceLabel = who.isEmpty() ? String.valueOf(r.faceSlot) : r.faceSlot + "\n" + who;
         r.faceKey = "afs:f:" + r.faceSlot;
         r.face = afsFace(afs, r.faceSlot);
         if (hair == Pairs.NONE) {
@@ -467,7 +482,8 @@ public class FacesActivity extends AppCompatActivity {
                 }
                 h.itemView.setOnClickListener(v -> {
                     pairs.set(row.faceSlot, hair);
-                    savePairs();
+                    overrides.put(row.faceSlot, hair);
+                    saveOverrides();
                     fillAfsRow(row);
                     afsAdapter.notifyItemChanged(position);
                     log("Cara " + row.faceSlot + " → " + (hair == Pairs.NONE ? getString(R.string.no_hair) : "HAIR " + hair));
@@ -487,7 +503,7 @@ public class FacesActivity extends AppCompatActivity {
         grid.scrollToPosition(Math.max(0, start));
 
         dialog[0] = new MaterialAlertDialogBuilder(this)
-                .setTitle(getString(R.string.pick_hair, row.faceLabel))
+                .setTitle(getString(R.string.pick_hair, row.faceLabel.replace('\n', ' ')))
                 .setView(root)
                 .setNegativeButton(R.string.cancel, null)
                 .show();
@@ -510,7 +526,7 @@ public class FacesActivity extends AppCompatActivity {
         final Afs a = afs;
         final Uri tree = extractTree;
         final List<Integer> f = new ArrayList<>(faces), h = new ArrayList<>(hairs);
-        final Pairs pr = Pairs.parse(pairs.serialize());
+        final Pairs pr = pairs.copy();
         log("Extrayendo en " + folderLabel(tree) + "/" + OUT_DIR + "…");
         worker.execute(() -> {
             int nf = 0, nh = 0, lone = 0;
@@ -526,11 +542,13 @@ public class FacesActivity extends AppCompatActivity {
                 log("Carpeta: " + dirName);
                 int done = 0, total = f.size() + h.size();
                 for (int face : f) {
-                    write(cr, dir, Pairs.faceName(face), a.read(face));
+                    List<String> who = pr.names(face);
+                    String player = who.isEmpty() ? null : who.get(0);
+                    write(cr, dir, Pairs.faceName(face, player), a.read(face));
                     nf++;
                     int hair = pr.hairFor(face);
                     if (hair != Pairs.NONE) {
-                        write(cr, dir, Pairs.hairName(face, hair), a.read(hair));
+                        write(cr, dir, Pairs.hairName(face, hair, player), a.read(hair));
                         nh++;
                     }
                     if (++done % 200 == 0) {
@@ -590,7 +608,8 @@ public class FacesActivity extends AppCompatActivity {
     private void loadBins(final Uri tree) {
         setBusy(true);
         binsSummary.setText("Leyendo la carpeta…");
-        final Pairs known = currentPairsForFolder();
+        // Parejas del AFS abierto en la pestaña 1, para .bin con nombres de otras herramientas.
+        final Pairs known = pairs.copy();
         worker.execute(() -> {
             final List<Row> rows = new ArrayList<>();
             String summary;
@@ -622,7 +641,9 @@ public class FacesActivity extends AppCompatActivity {
                         hb = hairBySlot.get(known.hairFor(id));
                     }
                     Row r = new Row();
-                    r.faceLabel = id != Pairs.NONE ? String.valueOf(id) : fb.name;
+                    String who = !fb.parsed.player.isEmpty() ? fb.parsed.player
+                            : id != Pairs.NONE ? known.label(id) : "";
+                    r.faceLabel = id == Pairs.NONE ? fb.name : who.isEmpty() ? String.valueOf(id) : id + "\n" + who;
                     r.faceKey = "uri:" + fb.uri;
                     r.face = uriSource(fb.uri, null);
                     if (hb != null) {
@@ -679,21 +700,6 @@ public class FacesActivity extends AppCompatActivity {
     /** Número de FACE que da el nombre del archivo, o NONE. */
     private static int faceId(BinFile b) {
         return b.parsed.ours ? b.parsed.face : b.parsed.slot;
-    }
-
-    /** Parejas del último AFS abierto, para emparejar .bin con nombres de otras herramientas. */
-    private Pairs currentPairsForFolder() {
-        if (afs != null) {
-            return Pairs.parse(pairs.serialize());
-        }
-        String key = prefs().getString("pairs_last", null);
-        Pairs p = key == null ? new Pairs() : Pairs.parse(prefs().getString(key, null));
-        for (int[] k : Pairs.KNOWN) {
-            if (!p.has(k[0])) {
-                p.set(k[0], k[1]);
-            }
-        }
-        return p;
     }
 
     private List<BinFile> listBins(Uri tree) throws IOException {

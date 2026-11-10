@@ -40,7 +40,7 @@
     <string name="extract_folder">Carpeta donde extraer</string>
     <string name="extract">Extraer y renombrar</string>
     <string name="extracting">Extrayendo…</string>
-    <string name="pick_hint">Toca una fila para elegir su HAIR. Se extraen como «1701 FACE.bin» y «1701 HAIR (slot 4593).bin».</string>
+    <string name="pick_hint">El HAIR de cada FACE sale de la base de datos de jugadores del AFS. Toca una fila para cambiarlo. Se extraen como «1701 FACE - RONALDINHO.bin» y «1701 HAIR (slot 4593) - RONALDINHO.bin».</string>
     <string name="bins_folder">Carpeta con los .bin extraídos</string>
     <string name="bins_empty">Elige la carpeta con los .bin para ver la lista. Toca una fila para ver su previa.</string>
     <string name="col_face">Cara</string>

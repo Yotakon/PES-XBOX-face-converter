@@ -1,30 +1,50 @@
 package com.yotakon.pesport.core;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Parejas FACE → HAIR por número de archivo dentro del 0_text.afs, y nombres de los .bin
- * extraídos. El 0_text.afs no guarda qué HAIR usa cada FACE (eso está en la base de datos de
- * jugadores del juego), así que las parejas vienen de esta tabla.
+ * Parejas FACE → HAIR por número de archivo dentro del 0_text.afs, nombres de jugador de cada
+ * FACE y nombres de los .bin extraídos. Las parejas salen de la base de datos de jugadores
+ * ({@link PlayerDb}); el usuario puede cambiar cualquiera a mano.
  */
 public final class Pairs {
     public static final int NONE = -1;
 
-    /**
-     * Parejas comprobadas en el 0_text.afs de PES 2010 PS2: {FACE, HAIR}.
-     * 1701/4593 = Ronaldinho (idénticos byte a byte a los .bin de muestra del repositorio).
-     */
-    public static final int[][] KNOWN = {{1701, 4593}};
-
-    private static final Pattern FACE_NAME = Pattern.compile("^(\\d+) FACE\\.bin$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern HAIR_NAME = Pattern.compile("^(\\d+) HAIR \\(slot (\\d+)\\)\\.bin$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FACE_NAME = Pattern.compile("^(\\d+) FACE( - .*)?\\.bin$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HAIR_NAME = Pattern.compile("^(\\d+) HAIR \\(slot (\\d+)\\)( - .*)?\\.bin$", Pattern.CASE_INSENSITIVE);
     private static final Pattern LONE_HAIR_NAME = Pattern.compile("^HAIR (\\d+) \\(sin FACE\\)\\.bin$", Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMBER = Pattern.compile("(\\d+)");
 
     private final TreeMap<Integer, Integer> map = new TreeMap<>();
+    private final TreeMap<Integer, List<String>> names = new TreeMap<>();
+
+    /**
+     * Parejas de la base de datos: cada jugador con FACE especial da FACE → su HAIR especial, o
+     * nada si usa un peinado genérico. Solo se aceptan números que de verdad son FACE / HAIR.
+     */
+    public static Pairs fromDb(List<PlayerDb.Player> players, int firstFace, int firstHair,
+                               Set<Integer> faces, Set<Integer> hairs) {
+        Pairs p = new Pairs();
+        for (PlayerDb.Player pl : players) {
+            int face = pl.faceSlot(firstFace);
+            if (face == NONE || !faces.contains(face)) {
+                continue;
+            }
+            p.addName(face, pl.name);
+            int hair = pl.hairSlot(firstHair);
+            if (hair != NONE && hairs.contains(hair) && !p.has(face)) {
+                p.set(face, hair);
+            }
+        }
+        return p;
+    }
 
     /** Número de HAIR de un FACE, o {@link #NONE}. */
     public int hairFor(int face) {
@@ -62,19 +82,70 @@ public final class Pairs {
         return map.containsValue(hair);
     }
 
-    /** Una línea "FACE=HAIR" por pareja. */
-    public String serialize() {
+    public void addName(int face, String name) {
+        if (name == null || name.isEmpty()) {
+            return;
+        }
+        List<String> l = names.get(face);
+        if (l == null) {
+            l = new ArrayList<>();
+            names.put(face, l);
+        }
+        if (!l.contains(name)) {
+            l.add(name);
+        }
+    }
+
+    /** Jugadores que usan esta FACE (normalmente uno). */
+    public List<String> names(int face) {
+        List<String> l = names.get(face);
+        return l == null ? Collections.<String>emptyList() : l;
+    }
+
+    /** Nombres separados por " / ", o "" si no hay. */
+    public String label(int face) {
         StringBuilder sb = new StringBuilder();
-        for (Map.Entry<Integer, Integer> e : map.entrySet()) {
+        for (String n : names(face)) {
+            if (sb.length() > 0) {
+                sb.append(" / ");
+            }
+            sb.append(n);
+        }
+        return sb.toString();
+    }
+
+    /** Copia con las mismas parejas y nombres. */
+    public Pairs copy() {
+        Pairs p = new Pairs();
+        p.map.putAll(map);
+        for (Map.Entry<Integer, List<String>> e : names.entrySet()) {
+            p.names.put(e.getKey(), new ArrayList<>(e.getValue()));
+        }
+        return p;
+    }
+
+    // ------------------------------------------------------------ cambios a mano
+
+    /** Aplica los cambios del usuario ({@link #NONE} = "Sin HAIR"). */
+    public void apply(Map<Integer, Integer> overrides) {
+        for (Map.Entry<Integer, Integer> e : overrides.entrySet()) {
+            set(e.getKey(), e.getValue());
+        }
+    }
+
+    /** Una línea "FACE=HAIR" por cambio; HAIR = -1 es "Sin HAIR". */
+    public static String serializeOverrides(Map<Integer, Integer> overrides) {
+        StringBuilder sb = new StringBuilder();
+        for (Map.Entry<Integer, Integer> e : overrides.entrySet()) {
             sb.append(e.getKey()).append('=').append(e.getValue()).append('\n');
         }
         return sb.toString();
     }
 
-    public static Pairs parse(String text) {
-        Pairs p = new Pairs();
+    public static TreeMap<Integer, Integer> parseOverrides(String text) {
+        TreeMap<Integer, Integer> out = new TreeMap<>();
         if (text == null) {
-            return p;
+            return out;
         }
         for (String line : text.split("\n")) {
             String t = line.trim();
@@ -83,23 +154,31 @@ public final class Pairs {
                 continue;
             }
             try {
-                p.set(Integer.parseInt(t.substring(0, eq).trim()), Integer.parseInt(t.substring(eq + 1).trim()));
+                int face = Integer.parseInt(t.substring(0, eq).trim());
+                int hair = Integer.parseInt(t.substring(eq + 1).trim());
+                out.put(face, hair < 0 ? NONE : hair);
             } catch (NumberFormatException ignored) {
                 // línea no válida: se ignora
             }
         }
-        return p;
+        return out;
     }
 
     // ------------------------------------------------------------ nombres de archivo
 
-    public static String faceName(int face) {
-        return face + " FACE.bin";
+    private static String suffix(String player) {
+        String s = player == null ? "" : PlayerDb.safeName(player);
+        return s.isEmpty() ? "" : " - " + s;
+    }
+
+    /** "1701 FACE - RONALDINHO.bin" (sin nombre de jugador: "1701 FACE.bin"). */
+    public static String faceName(int face, String player) {
+        return face + " FACE" + suffix(player) + ".bin";
     }
 
     /** El HAIR se nombra con el número de su FACE para que queden juntos al ordenar. */
-    public static String hairName(int face, int hair) {
-        return face + " HAIR (slot " + hair + ").bin";
+    public static String hairName(int face, int hair, String player) {
+        return face + " HAIR (slot " + hair + ")" + suffix(player) + ".bin";
     }
 
     public static String loneHairName(int hair) {
@@ -108,41 +187,48 @@ public final class Pairs {
 
     /** Lo que se deduce del nombre de un .bin. Los campos que no aparecen valen {@link #NONE}. */
     public static final class Name {
-        /** FACE al que pertenece (por nombre "N FACE.bin" o "N HAIR (slot M).bin"). */
+        /** FACE al que pertenece (por nombre "N FACE…" o "N HAIR (slot M)…"). */
         public final int face;
-        /** Número de HAIR en el AFS ("N HAIR (slot M).bin" o "HAIR M (sin FACE).bin"). */
+        /** Número de HAIR en el AFS ("N HAIR (slot M)…" o "HAIR M (sin FACE).bin"). */
         public final int hair;
         /** Primer número del nombre, para nombres de otras herramientas (p. ej. unnamed_1701.bin). */
         public final int slot;
         /** true si el nombre sigue el formato de esta app. */
         public final boolean ours;
+        /** Jugador que aparece en el nombre ("" si no hay). */
+        public final String player;
 
-        Name(int face, int hair, int slot, boolean ours) {
+        Name(int face, int hair, int slot, boolean ours, String player) {
             this.face = face;
             this.hair = hair;
             this.slot = slot;
             this.ours = ours;
+            this.player = player;
         }
+    }
+
+    private static String playerOf(String group) {
+        return group == null ? "" : group.substring(3).trim();
     }
 
     public static Name parseName(String name) {
         Matcher m = FACE_NAME.matcher(name);
         if (m.matches()) {
             int f = toInt(m.group(1));
-            return new Name(f, NONE, f, true);
+            return new Name(f, NONE, f, true, playerOf(m.group(2)));
         }
         m = HAIR_NAME.matcher(name);
         if (m.matches()) {
             int h = toInt(m.group(2));
-            return new Name(toInt(m.group(1)), h, h, true);
+            return new Name(toInt(m.group(1)), h, h, true, playerOf(m.group(3)));
         }
         m = LONE_HAIR_NAME.matcher(name);
         if (m.matches()) {
             int h = toInt(m.group(1));
-            return new Name(NONE, h, h, true);
+            return new Name(NONE, h, h, true, "");
         }
         m = NUMBER.matcher(name);
-        return new Name(NONE, NONE, m.find() ? toInt(m.group(1)) : NONE, false);
+        return new Name(NONE, NONE, m.find() ? toInt(m.group(1)) : NONE, false, "");
     }
 
     private static int toInt(String s) {

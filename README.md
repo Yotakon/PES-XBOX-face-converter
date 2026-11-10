@@ -28,15 +28,15 @@ En la pantalla principal, **Caras y pelos del 0_TEXT.AFS → Abrir**:
 
 - **Pestaña 0_TEXT.AFS:** **Buscar** el AFS. El registro muestra cuántas FACES y HAIRS tiene
   (en PES 2010 PS2: 1431 FACES en los archivos 1527–2957 y 1147 HAIRS en 4468–5614). La lista
-  muestra Cara | Pelo | Previa | Previa; toca una fila para elegir su HAIR o «Sin HAIR».
-  **Extraer y renombrar** guarda en la carpeta elegida `1701 FACE.bin`, `1701 HAIR (slot 4593).bin`
-  y los HAIRS no asignados como `HAIR 4600 (sin FACE).bin`.
+  muestra Cara (con el jugador) | Pelo | Previa | Previa; toca una fila para cambiar su HAIR.
+  **Extraer y renombrar** guarda en la carpeta elegida `1701 FACE - RONALDINHO.bin`,
+  `1701 HAIR (slot 4593) - RONALDINHO.bin` y los HAIRS sin FACE como `HAIR 4600 (sin FACE).bin`.
 - **Pestaña Carpeta .bin:** elige una carpeta con .bin extraídos; la lista empareja cada FACE con
   su HAIR por el nombre y, al tocar una fila, muestra arriba la previa de los dos.
 
-El 0_TEXT.AFS no guarda qué HAIR usa cada FACE (eso está en la base de datos de jugadores del
-juego). La app trae comprobada la pareja de Ronaldinho (1701 → 4593); el resto se asigna en la
-lista y la app lo recuerda.
+Las parejas salen de la base de datos de jugadores del propio 0_TEXT.AFS (archivos 32 y 33,
+ver `PlayerDb.java`): cada jugador tiene color de piel, número de FACE dentro de su grupo de piel
+y peinado (desde 1044 = HAIR especial). En PES 2010 PS2: 910 FACES con jugador, 819 con HAIR propio.
 
 ## Qué hace la conversión
 
