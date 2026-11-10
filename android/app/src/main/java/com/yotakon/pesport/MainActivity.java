@@ -91,6 +91,7 @@ public class MainActivity extends AppCompatActivity {
         addButton.setOnClickListener(v -> openFiles());
         convertButton.setOnClickListener(v -> convertAll());
         findViewById(R.id.choose_folder).setOnClickListener(v -> chooseFolder());
+        findViewById(R.id.open_faces).setOnClickListener(v -> startActivity(new Intent(this, FacesActivity.class)));
         refresh();
     }
 

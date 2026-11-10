@@ -22,6 +22,22 @@ Convierte FACES y HAIRS de **PES 2010 PS2** al formato de **PES 5 Xbox**.
 Descarga del APK de prueba (última compilación de la rama `app-android`):
 <https://github.com/Yotakon/PES-XBOX-face-converter/releases/download/ultima/PESFaceConverter.apk>
 
+## Caras y pelos del 0_TEXT.AFS
+
+En la pantalla principal, **Caras y pelos del 0_TEXT.AFS → Abrir**:
+
+- **Pestaña 0_TEXT.AFS:** **Buscar** el AFS. El registro muestra cuántas FACES y HAIRS tiene
+  (en PES 2010 PS2: 1431 FACES en los archivos 1527–2957 y 1147 HAIRS en 4468–5614). La lista
+  muestra Cara | Pelo | Previa | Previa; toca una fila para elegir su HAIR o «Sin HAIR».
+  **Extraer y renombrar** guarda en la carpeta elegida `1701 FACE.bin`, `1701 HAIR (slot 4593).bin`
+  y los HAIRS no asignados como `HAIR 4600 (sin FACE).bin`.
+- **Pestaña Carpeta .bin:** elige una carpeta con .bin extraídos; la lista empareja cada FACE con
+  su HAIR por el nombre y, al tocar una fila, muestra arriba la previa de los dos.
+
+El 0_TEXT.AFS no guarda qué HAIR usa cada FACE (eso está en la base de datos de jugadores del
+juego). La app trae comprobada la pareja de Ronaldinho (1701 → 4593); el resto se asigna en la
+lista y la app lo recuerda.
+
 ## Qué hace la conversión
 
 - Modelos: de paquetes VIF de PS2 (enteros de 16 bits) a vértices float de Xbox, con las

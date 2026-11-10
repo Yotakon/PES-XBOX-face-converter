@@ -23,4 +23,34 @@
     <string name="need_folder">Primero elige la carpeta de salida.</string>
     <string name="nothing_to_do">No hay archivos pendientes de convertir.</string>
     <string name="help">Después inserta los archivos «(PES5 Xbox).bin» en el 0_text.afs de PES 5 con tu herramienta AFS.</string>
+
+    <!-- Pantalla de caras y pelos del 0_TEXT.AFS -->
+    <string name="open_faces">Caras y pelos del 0_TEXT.AFS</string>
+    <string name="open_faces_desc">Busca las FACES con su HAIR, extráelas y mira sus previas.</string>
+    <string name="open">Abrir</string>
+    <string name="faces_title">FACES y HAIRS</string>
+    <string name="faces_subtitle">0_TEXT.AFS de PES 2010 PS2</string>
+    <string name="tab_afs">0_TEXT.AFS</string>
+    <string name="tab_folder">Carpeta .bin</string>
+    <string name="afs_file">Archivo 0_TEXT.AFS</string>
+    <string name="search">Buscar</string>
+    <string name="none_chosen">Sin elegir</string>
+    <string name="log_title">Registro</string>
+    <string name="log_empty">Busca el 0_TEXT.AFS para contar sus FACES y HAIRS.</string>
+    <string name="extract_folder">Carpeta donde extraer</string>
+    <string name="extract">Extraer y renombrar</string>
+    <string name="extracting">Extrayendo…</string>
+    <string name="pick_hint">Toca una fila para elegir su HAIR. Se extraen como «1701 FACE.bin» y «1701 HAIR (slot 4593).bin».</string>
+    <string name="bins_folder">Carpeta con los .bin extraídos</string>
+    <string name="bins_empty">Elige la carpeta con los .bin para ver la lista. Toca una fila para ver su previa.</string>
+    <string name="col_face">Cara</string>
+    <string name="col_hair">Pelo</string>
+    <string name="col_prev">Previa</string>
+    <string name="col_face_prev">Previa de la cara</string>
+    <string name="col_hair_prev">Previa del pelo</string>
+    <string name="no_hair">Sin HAIR</string>
+    <string name="no_face">Sin FACE</string>
+    <string name="pick_hair">HAIR de la cara %1$s</string>
+    <string name="need_afs">Primero busca el 0_TEXT.AFS.</string>
+    <string name="need_extract_folder">Primero elige la carpeta donde extraer.</string>
 </resources>
