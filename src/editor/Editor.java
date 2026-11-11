@@ -367,6 +367,7 @@ public class Editor
         convertItem.setEnabled(false);
       }
     });
+    buildFaceTeamMenu(mb);
     menu.add(localJMenuItem1);
     menu.add(open2Item);
     menu.add(saveItem);
@@ -376,8 +377,8 @@ public class Editor
     help.add(localJMenuItem4);
     tool.add(csvItem);
     tool.add(convertItem);
-    mb.add(menu);
-    mb.add(tool);
+    mb.add(menu, 0);
+    mb.add(tool, 1);
     mb.add(help);
     setJMenuBar(mb);
     csvItem.setEnabled(false);
@@ -387,6 +388,176 @@ public class Editor
     convertItem.setEnabled(false);
   }
   
+  private JMenu faceTeamMenu;
+  private RemoveSpecialFacesDialog removeSpecialDia;
+
+  private void buildFaceTeamMenu(JMenuBar mb)
+  {
+    faceTeamMenu = new JMenu("Caras y equipos");
+    JMenuItem faceExport = new JMenuItem("Exportar caras a CSV...");
+    JMenuItem faceImport = new JMenuItem("Importar caras desde CSV...");
+    JMenuItem removeSpecial = new JMenuItem("Quitar caras especiales...");
+    JMenuItem teamExport = new JMenuItem("Exportar equipos con formación...");
+    JMenuItem teamImport = new JMenuItem("Importar equipo...");
+
+    faceExport.addActionListener(new ActionListener()
+    {
+      public void actionPerformed(ActionEvent e)
+      {
+        File f = chooseCsv(true);
+        if (f == null) {
+          return;
+        }
+        try
+        {
+          int n = FaceTools.exportCsv(of, new FaceStats(of), f);
+          JOptionPane.showMessageDialog(getContentPane(), n + " jugadores exportados a\n" + f.getAbsolutePath(),
+              "Exportar caras", JOptionPane.INFORMATION_MESSAGE);
+        }
+        catch (IOException ex)
+        {
+          JOptionPane.showMessageDialog(getContentPane(), ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+      }
+    });
+    faceImport.addActionListener(new ActionListener()
+    {
+      public void actionPerformed(ActionEvent e)
+      {
+        File f = chooseCsv(false);
+        if (f == null) {
+          return;
+        }
+        try
+        {
+          FaceTools.ImportResult r = FaceTools.importCsv(of, new FaceStats(of), f);
+          StringBuilder msg = new StringBuilder("Jugadores modificados: " + r.changedPlayers);
+          if (!r.errors.isEmpty())
+          {
+            msg.append("\n\nAvisos (").append(r.errors.size()).append("):");
+            for (int i = 0; i < r.errors.size() && i < 20; i++) {
+              msg.append('\n').append(r.errors.get(i));
+            }
+            if (r.errors.size() > 20) {
+              msg.append("\n...");
+            }
+          }
+          msg.append("\n\nRecuerda guardar con File > Save.");
+          refreshAll();
+          JOptionPane.showMessageDialog(getContentPane(), msg.toString(), "Importar caras", JOptionPane.INFORMATION_MESSAGE);
+        }
+        catch (IOException ex)
+        {
+          JOptionPane.showMessageDialog(getContentPane(), ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+      }
+    });
+    removeSpecial.addActionListener(new ActionListener()
+    {
+      public void actionPerformed(ActionEvent e)
+      {
+        if (removeSpecialDia == null)
+        {
+          removeSpecialDia = new RemoveSpecialFacesDialog(Editor.this, of, new RemoveSpecialFacesDialog.Saver()
+          {
+            public boolean saveCopy(File file)
+            {
+              return of.saveXPS(withExtension(file));
+            }
+
+            public File suggestedCopy()
+            {
+              String name = currentFile.getName();
+              String ext = PES4Utils.getExtension(currentFile);
+              if (ext != null) {
+                name = name.substring(0, name.length() - ext.length() - 1);
+              }
+              return withExtension(new File(currentFile.getParentFile(), name + "_sin_especiales"));
+            }
+          }, new Runnable()
+          {
+            public void run()
+            {
+              refreshAll();
+            }
+          });
+        }
+        removeSpecialDia.showDialog();
+      }
+    });
+    teamExport.addActionListener(new ActionListener()
+    {
+      public void actionPerformed(ActionEvent e)
+      {
+        TeamTransferDialogs.exportTeams(getContentPane(), of);
+      }
+    });
+    teamImport.addActionListener(new ActionListener()
+    {
+      public void actionPerformed(ActionEvent e)
+      {
+        if (TeamTransferDialogs.importTeam(getContentPane(), of)) {
+          refreshAll();
+        }
+      }
+    });
+    faceTeamMenu.add(faceExport);
+    faceTeamMenu.add(faceImport);
+    faceTeamMenu.add(removeSpecial);
+    faceTeamMenu.addSeparator();
+    faceTeamMenu.add(teamExport);
+    faceTeamMenu.add(teamImport);
+    faceTeamMenu.setEnabled(false);
+    mb.add(faceTeamMenu);
+  }
+
+  /** Añade la extensión que corresponde al formato del option file abierto. */
+  private File withExtension(File f)
+  {
+    String want = null;
+    if (of.format == 0) {
+      want = "xps";
+    } else if (of.format == 2) {
+      want = "xsv";
+    } else if (of.format == 3) {
+      want = "zip";
+    }
+    if (want != null && !want.equals(PES4Utils.getExtension(f))) {
+      return new File(f.getParentFile(), f.getName() + "." + want);
+    }
+    return f;
+  }
+
+  private File chooseCsv(boolean save)
+  {
+    JFileChooser fc = new JFileChooser(currentFile != null ? currentFile.getParentFile() : null);
+    fc.addChoosableFileFilter(new CSVFilter());
+    fc.setAcceptAllFileFilterUsed(false);
+    int r = save ? fc.showSaveDialog(getContentPane()) : fc.showOpenDialog(getContentPane());
+    if (r != JFileChooser.APPROVE_OPTION) {
+      return null;
+    }
+    File f = fc.getSelectedFile();
+    if (save && !"csv".equals(PES4Utils.getExtension(f))) {
+      f = new File(f.getParentFile(), f.getName() + ".csv");
+    }
+    if (save && f.exists() && JOptionPane.showConfirmDialog(getContentPane(), f.getName() + " ya existe. ¿Reemplazarlo?",
+        "Reemplazar", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+      return null;
+    }
+    return f;
+  }
+
+  private void refreshAll()
+  {
+    flagPanel.refresh();
+    imagePanel.refresh();
+    tranPanel.refresh();
+    stadPan.refresh();
+    teamPan.refresh();
+    leaguePan.refresh();
+  }
+
   private boolean fileNameLegal(String paramString)
   {
     boolean bool = true;
@@ -483,6 +654,7 @@ public class Editor
         tabbedPane.setVisible(true);
         importPanel.refresh();
         csvItem.setEnabled(true);
+        faceTeamMenu.setEnabled(true);
         psdItem.setEnabled(true);
         open2Item.setEnabled(true);
         saveItem.setEnabled(true);
@@ -496,6 +668,7 @@ public class Editor
       else
       {
         csvItem.setEnabled(false);
+        faceTeamMenu.setEnabled(false);
         psdItem.setEnabled(false);
         open2Item.setEnabled(false);
         saveItem.setEnabled(false);

@@ -23,6 +23,7 @@ public class PlayerDialog
   PositionPanel posPanel;
   Ability99Panel abiPanel;
   SpecialAbilityPanel spePanel;
+  FacePanel facePanel;
   JButton acceptButton;
   JButton cancelButton;
   JButton importButton;
@@ -67,15 +68,19 @@ public class PlayerDialog
     this.posPanel = new PositionPanel();
     this.abiPanel = new Ability99Panel();
     this.spePanel = new SpecialAbilityPanel();
+    this.facePanel = new FacePanel(new FaceStats(this.of));
     bPanel.add(this.acceptButton);
     bPanel.add(localCancelButton);
     bPanel.add(this.importButton);
     lPanel.add(this.genPanel, "North");
     lPanel.add(this.posPanel, "Center");
     lPanel.add(bPanel, "South");
+    JPanel rPanel = new JPanel(new BorderLayout());
+    rPanel.add(this.spePanel, "Center");
+    rPanel.add(this.facePanel, "South");
     panel.add(lPanel);
     panel.add(this.abiPanel);
-    panel.add(this.spePanel);
+    panel.add(rPanel);
     getContentPane().add(panel);
     pack();
     setResizable(false);
@@ -95,6 +100,7 @@ public class PlayerDialog
     this.posPanel.load(this.of, this.stats, this.index);
     this.abiPanel.load(this.stats, this.index);
     this.spePanel.load(this.stats, this.index);
+    this.facePanel.load(this.index);
     setVisible(true);
   }
   private void error(String s)
@@ -271,6 +277,7 @@ public class PlayerDialog
     this.stats.dribSty.setValue(this.index, (String)this.genPanel.dribBox.getSelectedItem());
     this.stats.dkSty.setValue(this.index, (String)this.genPanel.dkBox.getSelectedItem());
     this.stats.statEdited.setValue(this.index, 1);
+    this.facePanel.save(this.index);
   }
   
   private int boToInt(boolean paramBoolean)
