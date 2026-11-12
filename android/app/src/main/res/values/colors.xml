@@ -1,12 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Colores tomados del icono: verde Xbox, amarillo de la flecha y azul marino del fondo. -->
+<!-- Barra de arriba verde y fondo negro. Verde y amarillo tomados del icono. -->
 <resources>
     <color name="brand_green">#3DAE2B</color>
-    <color name="brand_green_dark">#1E6E14</color>
     <color name="brand_yellow">#FFC21A</color>
-    <color name="brand_navy">#0B1A33</color>
 
-    <color name="app_background">#FCFDF6</color>
+    <!-- Barra superior (título y pestañas) y barra de estado -->
+    <color name="bar_green">#2E7D20</color>
+    <color name="bar_text_secondary">#D9FFFFFF</color>
+
+    <!-- Fondo negro y superficies (tarjetas, diálogos) un poco más claras -->
+    <color name="app_background">#000000</color>
+    <color name="surface_low">#0E120D</color>
+    <color name="surface">#141A13</color>
+    <color name="surface_high">#1B2219</color>
+    <color name="surface_highest">#232B21</color>
+    <color name="surface_variant">#28321F</color>
+    <color name="outline">#5B6655</color>
+
     <color name="preview_grass">#5A8C5A</color>
-    <color name="status_error">#B3261E</color>
 </resources>
