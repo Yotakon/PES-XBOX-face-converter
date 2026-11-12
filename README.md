@@ -89,6 +89,12 @@ python3 -m pesport "hair_ps2.bin" hair_xbox.bin --color 281e18 [--brillo 1.0]
 
 - `python3 tools/gen_referencias.py` regenera `tests/referencia/` con el conversor Python.
 - Las pruebas de la app (`android/app/src/test`) comparan su salida con esas referencias.
+- **Firma:** el APK de la release `ultima` se firma siempre con la misma clave, así que cada
+  versión nueva se instala encima de la anterior sin desinstalar. La clave no está en el repo:
+  va en los secretos de GitHub Actions `SIGNING_KEYSTORE_BASE64` (el `.jks` en base64),
+  `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` y `SIGNING_KEY_PASSWORD`. Si faltan, la
+  compilación falla en vez de publicar un APK con otra firma. Guarda una copia del `.jks` y su
+  contraseña: si se pierden, la siguiente versión obligará a desinstalar.
 - GitHub Actions compila el APK y lo publica en la release `ultima` en cada push a
   `app-android`. Para compilar en local hace falta Android Studio (o Gradle 8.9 + Android SDK 34):
   `gradle -p android assembleDebug`.
