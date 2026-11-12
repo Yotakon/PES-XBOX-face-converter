@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Siempre oscuro: fondo negro y barra de arriba verde (también con el móvil en modo claro). -->
+    <!-- Botones: verde Xbox (tonales y flotantes). Barra de arriba: bar_green. -->
     <style name="Base.Theme.PesConverter" parent="Theme.Material3.Dark.NoActionBar">
         <item name="colorPrimary">#8FDB78</item>
         <item name="colorOnPrimary">#053900</item>
-        <item name="colorPrimaryContainer">#1E6E14</item>
-        <item name="colorOnPrimaryContainer">#C3F7AE</item>
-        <item name="colorSecondary">#F5BF48</item>
-        <item name="colorOnSecondary">#402D00</item>
-        <item name="colorSecondaryContainer">#5C4200</item>
-        <item name="colorOnSecondaryContainer">#FFDF9E</item>
+        <item name="colorPrimaryContainer">#3DAE2B</item>
+        <item name="colorOnPrimaryContainer">#041F00</item>
+        <item name="colorSecondary">#7FD45E</item>
+        <item name="colorOnSecondary">#053900</item>
+        <item name="colorSecondaryContainer">#2E7D20</item>
+        <item name="colorOnSecondaryContainer">#FFFFFF</item>
         <item name="colorTertiary">#ACC7FF</item>
         <item name="colorOnTertiary">#002F67</item>
         <item name="colorTertiaryContainer">#11458E</item>

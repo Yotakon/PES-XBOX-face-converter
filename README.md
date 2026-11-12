@@ -87,6 +87,9 @@ python3 -m pesport "hair_ps2.bin" hair_xbox.bin --color 281e18 [--brillo 1.0]
 
 ## Desarrollo
 
+- **Logo:** `python3 tools/make_logo.py` (necesita `pip install pillow numpy scipy`) dibuja `icono.png`
+  con los recortes de `tools/logo/` (5 amarillo y esfera Xbox); luego `python3 tools/make_icons.py icono.png`
+  crea los iconos de Android.
 - `python3 tools/gen_referencias.py` regenera `tests/referencia/` con el conversor Python.
 - Las pruebas de la app (`android/app/src/test`) comparan su salida con esas referencias.
 - **Firma:** el APK de la release `ultima` se firma siempre con la misma clave, así que cada
