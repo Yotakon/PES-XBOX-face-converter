@@ -2,6 +2,13 @@
 <resources>
     <string name="app_name">PES Face Converter</string>
     <string name="subtitle">PES 2010 PS2 → PES 5 Xbox</string>
+
+    <!-- Pestañas principales -->
+    <string name="tab_convert">Convertir</string>
+    <string name="tab_import">Importar 0_TEXT</string>
+    <string name="tab_afs_tools">AFS</string>
+
+    <!-- Pestaña Convertir -->
     <string name="output_folder">Carpeta de salida</string>
     <string name="output_none">Sin elegir: los archivos convertidos se guardarán aquí</string>
     <string name="choose">Elegir</string>
@@ -22,14 +29,9 @@
     <string name="cancel">Cancelar</string>
     <string name="need_folder">Primero elige la carpeta de salida.</string>
     <string name="nothing_to_do">No hay archivos pendientes de convertir.</string>
-    <string name="help">Después inserta los archivos «(PES5 Xbox).bin» en el 0_text.afs de PES 5 con tu herramienta AFS.</string>
+    <string name="help">Después mete los archivos «(PES5 Xbox).bin» en el 0_text.afs de PES 5: en la pestaña AFS extrae el AFS, reemplaza los archivos del jugador y crea el AFS nuevo.</string>
 
-    <!-- Pantalla de FACES y HAIRS del 0_TEXT.AFS -->
-    <string name="open_faces">FACES y HAIRS del 0_TEXT.AFS</string>
-    <string name="open_faces_desc">Busca las FACES con su HAIR, extráelas y mira sus previas.</string>
-    <string name="open">Abrir</string>
-    <string name="faces_title">FACES y HAIRS</string>
-    <string name="faces_subtitle">0_TEXT.AFS de PES 2010 PS2</string>
+    <!-- Pestaña Importar 0_TEXT -->
     <string name="tab_afs">0_TEXT.AFS</string>
     <string name="tab_folder">Carpeta</string>
     <string name="afs_file">Archivo 0_TEXT.AFS</string>
@@ -53,4 +55,32 @@
     <string name="pick_hair">HAIR de la FACE %1$s</string>
     <string name="need_afs">Primero busca el 0_TEXT.AFS.</string>
     <string name="need_extract_folder">Primero elige la carpeta donde extraer.</string>
+
+    <!-- Pestaña AFS -->
+    <string name="tab_afs_extract">Extraer AFS</string>
+    <string name="tab_afs_build">Crear AFS</string>
+    <string name="afs_source">Archivo AFS</string>
+    <string name="afs_extract">Extraer a carpeta</string>
+    <string name="afs_extract_hint">Se crea una carpeta con el nombre del AFS y dentro cada archivo como «00000.bin», «00001.bin»…, en el mismo orden que en el AFS, más AFS_INFO.txt con los datos para volver a crearlo.</string>
+    <string name="afs_extract_log_empty">Busca un AFS (por ejemplo el 0_text.afs de PES 5) y elige dónde extraerlo.</string>
+    <string name="afs_extract_done">Ve a «Crear AFS»: la carpeta extraída ya está elegida.</string>
+    <string name="need_src_afs">Primero busca el archivo AFS.</string>
+    <string name="afs_build_folder">Carpeta con los archivos</string>
+    <string name="afs_build_empty">Elige una carpeta extraída con «Extraer AFS». Cada archivo va al AFS en la posición de su nombre (00000.bin, 00001.bin…), aunque sea más grande que el original.</string>
+    <string name="afs_build">Crear AFS</string>
+    <string name="afs_reading_folder">Leyendo la carpeta…</string>
+    <string name="afs_checking">Revisando la carpeta…</string>
+    <string name="afs_no_entries">No hay archivos con nombre de índice (00000.bin, 00001.bin…) en esta carpeta.</string>
+    <string name="need_build_folder">Primero elige la carpeta con los archivos del AFS.</string>
+    <string name="col_file">Archivo</string>
+    <string name="col_size">Tamaño</string>
+    <string name="afs_entry_empty">vacío en el original</string>
+    <string name="afs_entry_missing">falta</string>
+    <string name="afs_entry_changed">cambiado (antes %1$s)</string>
+    <string name="afs_replace_title">Reemplazar archivo</string>
+    <string name="afs_replace">Reemplazar</string>
+    <string name="afs_replace_confirm">%1$s (%2$s) se sustituye por «%3$s» (%4$s). El archivo de la carpeta se sobrescribe.</string>
+    <string name="afs_replaced">%1$s reemplazado (%2$s)</string>
+    <string name="afs_cannot_build">No se puede crear el AFS: %1$s</string>
+    <string name="afs_built">%1$s creado con %2$d archivos (%3$s). Cópialo al juego en lugar del original (guarda una copia del original).</string>
 </resources>

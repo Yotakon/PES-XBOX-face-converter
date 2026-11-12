@@ -1,23 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Base.Theme.PesConverter" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">#2E7D20</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorPrimaryContainer">#B7F4A0</item>
-        <item name="colorOnPrimaryContainer">#032100</item>
-        <item name="colorSecondary">#7A5900</item>
-        <item name="colorOnSecondary">#FFFFFF</item>
-        <item name="colorSecondaryContainer">#FFDF9E</item>
-        <item name="colorOnSecondaryContainer">#261A00</item>
-        <item name="colorTertiary">#2F5DA8</item>
-        <item name="colorOnTertiary">#FFFFFF</item>
-        <item name="colorTertiaryContainer">#D7E2FF</item>
-        <item name="colorOnTertiaryContainer">#001A40</item>
-        <!-- Fondo de la app; la barra de navegacion usa el mismo color. -->
+    <!-- Siempre oscuro: fondo negro y barra de arriba verde (también con el móvil en modo claro). -->
+    <style name="Base.Theme.PesConverter" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">#8FDB78</item>
+        <item name="colorOnPrimary">#053900</item>
+        <item name="colorPrimaryContainer">#1E6E14</item>
+        <item name="colorOnPrimaryContainer">#C3F7AE</item>
+        <item name="colorSecondary">#F5BF48</item>
+        <item name="colorOnSecondary">#402D00</item>
+        <item name="colorSecondaryContainer">#5C4200</item>
+        <item name="colorOnSecondaryContainer">#FFDF9E</item>
+        <item name="colorTertiary">#ACC7FF</item>
+        <item name="colorOnTertiary">#002F67</item>
+        <item name="colorTertiaryContainer">#11458E</item>
+        <item name="colorOnTertiaryContainer">#D7E2FF</item>
+
         <item name="android:colorBackground">@color/app_background</item>
+        <item name="colorOnBackground">#E2E3DC</item>
         <item name="colorSurface">@color/app_background</item>
+        <item name="colorOnSurface">#E2E3DC</item>
+        <item name="colorSurfaceVariant">@color/surface_variant</item>
+        <item name="colorOnSurfaceVariant">#C2C9BB</item>
+        <item name="colorSurfaceContainerLowest">@color/app_background</item>
+        <item name="colorSurfaceContainerLow">@color/surface_low</item>
+        <item name="colorSurfaceContainer">@color/surface</item>
+        <item name="colorSurfaceContainerHigh">@color/surface_high</item>
+        <item name="colorSurfaceContainerHighest">@color/surface_highest</item>
+        <item name="colorOutline">@color/outline</item>
+        <item name="colorOutlineVariant">#3A4436</item>
+
         <item name="android:windowBackground">@color/app_background</item>
-        <item name="android:statusBarColor">@color/brand_navy</item>
+        <item name="android:statusBarColor">@color/bar_green</item>
         <item name="android:navigationBarColor">@color/app_background</item>
     </style>
 
