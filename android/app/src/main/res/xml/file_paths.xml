@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- El APK descargado para actualizar se guarda en la caché de la app y se comparte con el instalador. -->
+<paths>
+    <cache-path name="updates" path="updates/" />
+</paths>

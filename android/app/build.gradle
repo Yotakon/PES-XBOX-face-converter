@@ -21,7 +21,7 @@ android {
         targetSdk 34
         // Cada compilación de GitHub Actions sube el número (VERSION_CODE = 100 + nº de ejecución).
         versionCode((System.getenv('VERSION_CODE') ?: '5') as int)
-        versionName '2.0'
+        versionName '2.1'
         vectorDrawables.useSupportLibrary true
     }
 

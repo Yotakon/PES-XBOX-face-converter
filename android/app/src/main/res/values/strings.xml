@@ -83,4 +83,21 @@
     <string name="afs_replaced">%1$s reemplazado (%2$s)</string>
     <string name="afs_cannot_build">No se puede crear el AFS: %1$s</string>
     <string name="afs_built">%1$s creado con %2$d archivos (%3$s). Cópialo al juego en lugar del original (guarda una copia del original).</string>
+
+    <!-- Actualizar desde la app -->
+    <string name="update_check">Buscar actualización</string>
+    <string name="update_checking">Buscando actualización…</string>
+    <string name="update_title_new">Hay una versión nueva</string>
+    <string name="update_new_message">Instalada: %1$s (compilación %2$d)\nNueva: %3$s (compilación %4$d)\nTamaño: %5$s\nPublicada: %6$s</string>
+    <string name="update_now">Actualizar</string>
+    <string name="update_later">Ahora no</string>
+    <string name="update_uptodate">Tienes la última versión: %1$s (compilación %2$d).</string>
+    <string name="update_snack">Hay una versión nueva de la app</string>
+    <string name="update_snack_action">Ver</string>
+    <string name="update_downloading">Descargando la actualización…</string>
+    <string name="update_error">No se pudo actualizar: %1$s</string>
+    <string name="update_permission_title">Permiso para instalar</string>
+    <string name="update_permission_message">Android necesita que permitas a esta app instalar aplicaciones. Pulsa «Abrir ajustes», activa el permiso y vuelve: la instalación seguirá sola.</string>
+    <string name="update_open_settings">Abrir ajustes</string>
+    <string name="update_signature_hint">Si Android dice que no se puede instalar, la app instalada está firmada con otra clave (por ejemplo una versión de prueba): desinstálala y vuelve a instalar.</string>
 </resources>

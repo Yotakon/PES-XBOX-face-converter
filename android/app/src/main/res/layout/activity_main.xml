@@ -51,6 +51,15 @@
                     android:textAppearance="?attr/textAppearanceBodyMedium"
                     android:textColor="@color/bar_text_secondary" />
             </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/update_button"
+                style="@style/Widget.Material3.Button.IconButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/update_check"
+                app:icon="@drawable/ic_update"
+                app:iconTint="@android:color/white" />
         </LinearLayout>
 
         <com.google.android.material.tabs.TabLayout

@@ -55,6 +55,7 @@ jobs:
           VERSION_CODE: ${{ github.run_number }}
         run: |
           export VERSION_CODE=$((100 + VERSION_CODE))
+          echo "APP_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_ENV"
           gradle -p android assembleRelease --stacktrace
 
       - name: Comprobar la firma
@@ -73,11 +74,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk PESFaceConverter.apk
+          VNAME=$(grep -oP "versionName '\K[^']+" android/app/build.gradle)
+          # La app lee estas dos líneas para saber si hay una versión nueva (actualizar desde la app).
+          printf 'APK firmado, compilado automaticamente desde la rama app-android (%s). Se instala encima de la version anterior.\n\nversionCode=%s\nversionName=%s\n' \
+            "$GITHUB_SHA" "$APP_VERSION_CODE" "$VNAME" > notas.txt
           gh release delete ultima --yes --cleanup-tag || true
           gh release create ultima PESFaceConverter.apk \
             --target "$GITHUB_SHA" --prerelease \
             --title "PES Face Converter (ultima compilacion)" \
-            --notes "APK firmado, compilado automaticamente desde la rama app-android ($GITHUB_SHA). Se instala encima de la version anterior."
+            --notes-file notas.txt
 
       - uses: actions/upload-artifact@v4
         if: always()

@@ -65,6 +65,17 @@ Formato que escribe: `AFS\0`, número de archivos, tabla (offset, tamaño), sin 
 2048 bytes. Si no cambias nada, el AFS creado es idéntico byte a byte al que se extrajo
 (si este seguía el mismo formato). Guarda una copia del AFS original antes de usar el nuevo.
 
+## Actualizar desde la app
+
+El botón de descarga de la barra verde (arriba a la derecha) busca la última versión en la release
+`ultima`. Al abrir la app también lo comprueba en silencio y avisa si hay una nueva. Si la hay, **Actualizar** descarga
+el APK, comprueba su SHA-256 y que sea de esta app con un número de versión mayor, y abre el
+instalador de Android (la primera vez pide el permiso «instalar apps desconocidas» para esta app).
+
+La app sabe el número de versión porque el workflow escribe `versionCode=` y `versionName=` en las
+notas de la release. Android solo instala encima si el APK tiene la misma firma que el instalado:
+una versión de prueba compilada en local (firma de depuración) hay que desinstalarla antes.
+
 ## Qué hace la conversión
 
 - Modelos: de paquetes VIF de PS2 (enteros de 16 bits) a vértices float de Xbox, con las
@@ -87,8 +98,8 @@ python3 -m pesport "hair_ps2.bin" hair_xbox.bin --color 281e18 [--brillo 1.0]
 
 ## Desarrollo
 
-- **Logo:** `python3 tools/make_logo.py` (necesita `pip install pillow numpy scipy`) dibuja `icono.png`
-  con los recortes de `tools/logo/` (5 amarillo y esfera Xbox); luego `python3 tools/make_icons.py icono.png`
+- **Logo:** `python3 tools/make_logo.py` (necesita `pip install pillow numpy scipy`) dibuja desde cero
+  `icono.png` (5 amarillo y esfera Xbox, todo por código); luego `python3 tools/make_icons.py icono.png`
   crea los iconos de Android.
 - `python3 tools/gen_referencias.py` regenera `tests/referencia/` con el conversor Python.
 - Las pruebas de la app (`android/app/src/test`) comparan su salida con esas referencias.
