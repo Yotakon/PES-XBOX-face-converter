@@ -8,12 +8,14 @@ import android.os.ParcelFileDescriptor
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DividerItemDecoration
@@ -25,11 +27,13 @@ import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.tabs.TabLayout
+import com.google.android.material.textfield.TextInputLayout
 import com.yotakon.pesport.core.Afs
 import com.yotakon.pesport.core.Converter
 import com.yotakon.pesport.core.FaceHair
 import com.yotakon.pesport.core.Pairs
 import com.yotakon.pesport.core.Parallel
+import com.yotakon.pesport.core.Search
 import com.yotakon.pesport.core.PlayerDb
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -42,7 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.google.android.material.R as MR
 
 /**
- * Pestaña Importar 0_TEXT: caras y pelos del 0_TEXT.AFS de PES 2010 PS2.
+ * Pestaña Extraer e Importar F & H: caras y pelos del 0_TEXT.AFS de PES 2010 PS2.
  * Subpestaña 1: busca el AFS, cuenta FACES y HAIRS, empareja cada FACE con su HAIR y los extrae
  * renombrados. Subpestaña 2: abre una carpeta de .bin extraídos y muestra las parejas con previa.
  */
@@ -155,6 +159,21 @@ class FacesFragment : Fragment(R.layout.fragment_faces) {
         binsHeader.findViewById<View>(R.id.head_prev_face).visibility = View.GONE
         binsHeader.findViewById<View>(R.id.head_prev_hair).visibility = View.GONE
         setupList(view.findViewById(R.id.bins_list), binsAdapter)
+
+        // Buscador de la lista de la carpeta: por número (1701, 4593) o por jugador.
+        val search = view.findViewById<TextInputLayout>(R.id.bins_search)
+        search.hint = getString(R.string.bins_search_hint)
+        search.editText?.apply {
+            doAfterTextChanged {
+                binsAdapter.setFilter(it?.toString().orEmpty())
+                view.findViewById<RecyclerView>(R.id.bins_list).scrollToPosition(0)
+            }
+            setOnEditorActionListener { v, _, _ ->
+                (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .hideSoftInputFromWindow(v.windowToken, 0)
+                true
+            }
+        }
 
         extractTree = prefs().getString(KEY_EXTRACT, null)?.let(Uri::parse)
         binsTree = prefs().getString(KEY_BINS, null)?.let(Uri::parse)
@@ -362,7 +381,7 @@ class FacesFragment : Fragment(R.layout.fragment_faces) {
                 fillAfsRow(it)
             })
         }
-        afsAdapter.notifyDataSetChanged()
+        afsAdapter.refresh()
     }
 
     private fun fillAfsRow(r: Row) {
@@ -430,7 +449,7 @@ class FacesFragment : Fragment(R.layout.fragment_faces) {
                     overrides[row.faceSlot] = hair
                     saveOverrides()
                     fillAfsRow(row)
-                    afsAdapter.notifyItemChanged(position)
+                    afsAdapter.changed(position)
                     log("FACE ${row.faceSlot} → " + if (hair == Pairs.NONE) getString(R.string.no_hair) else "HAIR $hair")
                     log(pairSummary())
                     dialog?.dismiss()
@@ -615,9 +634,10 @@ class FacesFragment : Fragment(R.layout.fragment_faces) {
             }
             binRows.clear()
             binRows.addAll(rows)
-            binsAdapter.notifyDataSetChanged()
+            binsAdapter.refresh()
             binsSummary.text = summary
-            if (binRows.isNotEmpty()) showPreview(0) else clearPreview()
+            val first = binsAdapter.firstShown()
+            if (first >= 0) showPreview(first) else clearPreview()
             setBusy(false)
         }
     }
@@ -672,7 +692,31 @@ class FacesFragment : Fragment(R.layout.fragment_faces) {
         private val onRow: (Int) -> Unit,
         private val previews: Boolean,
     ) : RecyclerView.Adapter<PairAdapter.Holder>() {
+        /** Posición en [rows] de lo que se ve (todo, o solo lo que coincide con el buscador). */
+        private var shown: List<Int> = emptyList()
+        private var filter = ""
+        /** Fila seleccionada (posición en [rows]). */
         private var selected = RecyclerView.NO_POSITION
+
+        /** Vuelve a calcular lo que se ve; llamar cuando cambia [rows]. */
+        fun refresh() {
+            shown = if (filter.isEmpty()) rows.indices.toList()
+            else rows.indices.filter { Search.containsText(rows[it].faceLabel + " " + rows[it].hairLabel, filter) }
+            notifyDataSetChanged()
+        }
+
+        fun setFilter(q: String) {
+            filter = q.trim()
+            refresh()
+        }
+
+        /** Primera fila que se ve (posición en [rows]) o -1. */
+        fun firstShown(): Int = shown.firstOrNull() ?: -1
+
+        fun changed(row: Int) {
+            val p = shown.indexOf(row)
+            if (p >= 0) notifyItemChanged(p)
+        }
 
         inner class Holder(v: View) : RecyclerView.ViewHolder(v) {
             val face: TextView = v.findViewById(R.id.face)
@@ -681,24 +725,25 @@ class FacesFragment : Fragment(R.layout.fragment_faces) {
             val hairPrev: ImageView = v.findViewById(R.id.hair_prev)
         }
 
-        fun select(position: Int) {
+        fun select(row: Int) {
             val old = selected
-            selected = position
-            if (old != RecyclerView.NO_POSITION) notifyItemChanged(old)
-            notifyItemChanged(position)
+            selected = row
+            if (old != RecyclerView.NO_POSITION) changed(old)
+            changed(row)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) =
             Holder(LayoutInflater.from(parent.context).inflate(R.layout.item_pair, parent, false))
 
         override fun onBindViewHolder(h: Holder, position: Int) {
-            val r = rows[position]
+            val row = shown[position]
+            val r = rows[row]
             h.face.text = r.faceLabel
             h.hair.text = r.hairLabel
             h.hair.alpha = if (r.hair == null) 0.6f else 1f
-            h.itemView.isActivated = position == selected
+            h.itemView.isActivated = row == selected
             h.itemView.setBackgroundColor(
-                if (position == selected) MaterialColors.getColor(h.itemView, MR.attr.colorSecondaryContainer) else 0
+                if (row == selected) MaterialColors.getColor(h.itemView, MR.attr.colorSecondaryContainer) else 0
             )
             h.facePrev.visibility = if (previews) View.VISIBLE else View.GONE
             h.hairPrev.visibility = if (previews) View.VISIBLE else View.GONE
@@ -708,11 +753,11 @@ class FacesFragment : Fragment(R.layout.fragment_faces) {
             }
             h.itemView.setOnClickListener {
                 val p = h.bindingAdapterPosition
-                if (p != RecyclerView.NO_POSITION) onRow(p)
+                if (p != RecyclerView.NO_POSITION) onRow(shown[p])
             }
         }
 
-        override fun getItemCount() = rows.size
+        override fun getItemCount() = shown.size
     }
 
     companion object {

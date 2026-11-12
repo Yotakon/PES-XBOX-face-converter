@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Barra de búsqueda que va arriba de una lista, dentro de su recuadro. El hint y el tipo de teclado se ponen en código. -->
+<com.google.android.material.textfield.TextInputLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:endIconMode="clear_text"
+    app:startIconDrawable="@drawable/ic_search">
+
+    <com.google.android.material.textfield.TextInputEditText
+        android:id="@+id/search_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:imeOptions="actionSearch"
+        android:maxLines="1"
+        android:singleLine="true" />
+</com.google.android.material.textfield.TextInputLayout>

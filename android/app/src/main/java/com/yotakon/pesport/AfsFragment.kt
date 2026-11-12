@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
+import android.text.InputType
+import android.view.inputmethod.InputMethodManager
 import android.provider.DocumentsContract
 import android.view.LayoutInflater
 import android.view.View
@@ -11,6 +13,7 @@ import android.view.ViewGroup
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.DividerItemDecoration
@@ -22,12 +25,14 @@ import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.tabs.TabLayout
 import com.yotakon.pesport.core.Afs
 import com.yotakon.pesport.core.AfsFolder
 import com.yotakon.pesport.core.AfsWriter
 import com.yotakon.pesport.core.ConversionException
 import com.yotakon.pesport.core.Parallel
+import com.yotakon.pesport.core.Search
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -90,6 +95,8 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
     private var fastName = ""
     private var fastScan: Scan? = null
     private var scanSummary = ""
+    /** Texto del buscador de la lista de Crear AFS (vacío = se ven todos los archivos). */
+    private var query = ""
     private var busy = false
 
     /** Archivo que se va a reemplazar (índice de la lista) mientras el usuario elige el nuevo. */
@@ -182,6 +189,23 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
         list.addItemDecoration(DividerItemDecoration(requireContext(), DividerItemDecoration.VERTICAL))
         list.adapter = adapter
 
+        // Buscador: escribe el número del archivo (1701) y la lista solo muestra ese.
+        val search = view.findViewById<TextInputLayout>(R.id.afs_search)
+        search.hint = getString(R.string.afs_search_hint)
+        search.editText?.apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            doAfterTextChanged {
+                query = it?.toString().orEmpty()
+                adapter.update()
+                list.scrollToPosition(0)
+            }
+            setOnEditorActionListener { v, _, _ ->
+                (requireContext().getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
+                    .hideSoftInputFromWindow(v.windowToken, 0)
+                true
+            }
+        }
+
         dstTree = prefs().getString(KEY_DST, null)?.let(Uri::parse)
         buildFolder = Folder.parse(prefs().getString(KEY_BUILD, null))
         refreshLabels()
@@ -219,7 +243,7 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
         fastHint.visibility = if (fastMode) View.VISIBLE else View.GONE
         cardFastAfs.visibility = if (fastMode) View.VISIBLE else View.GONE
         cardBuildFolder.visibility = if (fastMode) View.GONE else View.VISIBLE
-        adapter.notifyDataSetChanged()
+        adapter.update()
         refreshSummary()
     }
 
@@ -271,7 +295,7 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
                 fastAfs = afs
                 fastName = name
                 fastScan = sc
-                adapter.notifyDataSetChanged()
+                adapter.update()
                 refreshSummary()
             }.onFailure { e ->
                 fastAfsText.text = getString(R.string.none_chosen)
@@ -393,11 +417,11 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
             val result = withContext(Dispatchers.IO) { runCatching { scanFolder(ctx, folder) } }
             result.onSuccess { s ->
                 scan = s
-                if (!fastMode) adapter.notifyDataSetChanged()
+                if (!fastMode) adapter.update()
                 refreshSummary()
             }.onFailure { e ->
                 scan = null
-                if (!fastMode) adapter.notifyDataSetChanged()
+                if (!fastMode) adapter.update()
                 refreshSummary()
                 if (!fastMode) {
                     scanSummary = "Error: ${e.message}"
@@ -487,7 +511,7 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
                 .setPositiveButton(R.string.afs_replace) { _, _ ->
                     e.repl = Repl(uri, newName)
                     e.size = size
-                    adapter.notifyItemChanged(pos)
+                    adapter.changed(e.index)
                     refreshSummary()
                 }
                 .setNegativeButton(R.string.cancel, null)
@@ -511,7 +535,7 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
         val e = fastScan?.entries?.getOrNull(pos) ?: return
         e.repl = null
         e.size = e.original
-        adapter.notifyItemChanged(pos)
+        adapter.changed(e.index)
         refreshSummary()
     }
 
@@ -655,6 +679,21 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
     // ------------------------------------------------------------ lista
 
     private inner class EntryAdapter : RecyclerView.Adapter<EntryAdapter.Holder>() {
+        private var shown: List<Entry> = emptyList()
+
+        /** Vuelve a calcular qué archivos se ven (modo, lista o buscador cambiados). */
+        fun update() {
+            val all = current()?.entries ?: emptyList()
+            val q = query.trim()
+            shown = if (q.isEmpty()) all else all.filter { Search.matches(it.index, it.name, q) }.sortedBy { Search.rank(it.index, q) }
+            notifyDataSetChanged()
+        }
+
+        fun changed(index: Int) {
+            val p = shown.indexOfFirst { it.index == index }
+            if (p >= 0) notifyItemChanged(p)
+        }
+
         inner class Holder(v: View) : RecyclerView.ViewHolder(v) {
             val name: TextView = v.findViewById(R.id.entry_name)
             val status: TextView = v.findViewById(R.id.entry_status)
@@ -665,8 +704,8 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
             Holder(LayoutInflater.from(parent.context).inflate(R.layout.item_afs_entry, parent, false))
 
         override fun onBindViewHolder(h: Holder, position: Int) {
-            val sc = current()
-            val e = sc?.entries?.get(position) ?: return
+            val sc = current() ?: return
+            val e = shown.getOrNull(position) ?: return
             h.name.text = e.name
             val normal = MaterialColors.getColor(h.status, MR.attr.colorOnSurfaceVariant)
             val primary = MaterialColors.getColor(h.status, MR.attr.colorPrimary)
@@ -705,11 +744,11 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
             else if (e.child != null && e.size >= 0) sizeText(e.size) else "—"
             h.itemView.setOnClickListener {
                 val p = h.bindingAdapterPosition
-                if (p != RecyclerView.NO_POSITION) onEntryTapped(p)
+                if (p != RecyclerView.NO_POSITION) shown.getOrNull(p)?.let { onEntryTapped(it.index) }
             }
         }
 
-        override fun getItemCount() = current()?.entries?.size ?: 0
+        override fun getItemCount() = shown.size
     }
 
     companion object {

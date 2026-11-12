@@ -5,7 +5,7 @@
 
     <!-- Pestañas principales -->
     <string name="tab_convert">Convertir</string>
-    <string name="tab_import">Importar 0_TEXT</string>
+    <string name="tab_import">Extraer e Importar F &amp; H</string>
     <string name="tab_afs_tools">AFS</string>
 
     <!-- Pestaña Convertir -->
@@ -31,7 +31,7 @@
     <string name="nothing_to_do">No hay archivos pendientes de convertir.</string>
     <string name="help">Después mete los archivos «(PES5 Xbox).bin» en el 0_text.afs de PES 5: en la pestaña AFS extrae el AFS, reemplaza los archivos del jugador y crea el AFS nuevo.</string>
 
-    <!-- Pestaña Importar 0_TEXT -->
+    <!-- Pestaña Extraer e Importar F & H -->
     <string name="tab_afs">0_TEXT.AFS</string>
     <string name="tab_folder">Carpeta</string>
     <string name="afs_file">Archivo 0_TEXT.AFS</string>
@@ -110,4 +110,8 @@
     <string name="afs_entry_replaced">reemplazado por «%1$s» (antes %2$s)</string>
     <string name="afs_replace_confirm_fast">%1$s (%2$s) se sustituye por «%3$s» (%4$s) en el AFS nuevo. El AFS original no se modifica.</string>
     <string name="afs_remove_replacement">Quitar reemplazo</string>
+
+    <!-- Buscadores de las listas -->
+    <string name="afs_search_hint">Buscar por número de archivo</string>
+    <string name="bins_search_hint">Buscar por número o jugador</string>
 </resources>

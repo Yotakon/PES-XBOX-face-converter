@@ -3,7 +3,7 @@
 Convierte FACES y HAIRS de **PES 2010 PS2** al formato de **PES 5 Xbox**.
 
 - **App Android** (`android/`, en Kotlin): tres pestañas. **Convertir** pasa los `.bin` de
-  PES 2010 a PES 5 Xbox; **Importar 0_TEXT** busca y extrae FACES y HAIRS del 0_TEXT.AFS de
+  PES 2010 a PES 5 Xbox; **Extraer e Importar F & H** busca y extrae FACES y HAIRS del 0_TEXT.AFS de
   PES 2010; **AFS** extrae un AFS a una carpeta y crea un AFS de PES 5 a partir de una carpeta.
 - **Conversor de referencia en Python** (`tools/pesport/`): misma conversión desde la línea de
   comandos. Es la versión que se validó en el juego; la app produce exactamente los mismos bytes.
@@ -15,7 +15,7 @@ Convierte FACES y HAIRS de **PES 2010 PS2** al formato de **PES 5 Xbox**.
 Pestaña **Convertir**:
 
 1. Extrae del `0_text.afs` de PES 2010 PS2 los `.bin` del FACE y el HAIR del jugador
-   (pestaña **Importar 0_TEXT**).
+   (pestaña **Extraer e Importar F & H**).
 2. **Añadir .bin** → elige uno o varios.
 3. En cada HAIR, pulsa **Color** y elige el color y el brillo (PES 2010 guarda el HAIR en gris
    y el juego lo tiñe; PES 5 necesita la textura ya coloreada).
@@ -26,7 +26,7 @@ Pestaña **Convertir**:
 Descarga del APK de prueba (última compilación de la rama `app-android`):
 <https://github.com/Yotakon/PES-XBOX-face-converter/releases/download/ultima/PESFaceConverter.apk>
 
-## Pestaña Importar 0_TEXT (caras y pelos del 0_TEXT.AFS)
+## Pestaña Extraer e Importar F & H (caras y pelos del 0_TEXT.AFS)
 
 - **Subpestaña 0_TEXT.AFS:** **Buscar** el AFS. El registro muestra cuántas FACES y HAIRS tiene
   (en PES 2010 PS2: 1431 FACES en los archivos 1527–2957 y 1147 HAIRS en 4468–5614). La lista
@@ -35,6 +35,10 @@ Descarga del APK de prueba (última compilación de la rama `app-android`):
   `1701 HAIR (slot 4593) - RONALDINHO.bin` y los HAIRS sin FACE como `HAIR 4600 (sin FACE).bin`.
 - **Subpestaña Carpeta:** elige una carpeta con .bin extraídos; la lista (sin previas) empareja cada
   FACE con su HAIR por el nombre y, al tocar una fila, muestra arriba la previa de los dos.
+
+En la subpestaña Carpeta, el recuadro de previa tiene FACE en la esquina izquierda y HAIR en la derecha, y
+la lista lleva un buscador arriba: escribe un número (1701, 4593) o un jugador y solo se ven las filas que
+coinciden.
 
 FACES que no están en la base de datos (por ejemplo Bergkamp) salen como «No Implementado» y sin
 HAIR: la app no deduce nada por el orden de los archivos. Los grupos de piel de las FACES tienen
@@ -54,6 +58,10 @@ AFS (donde cada archivo tiene un hueco fijo), se crea un AFS nuevo con todos los
   otro `.bin` (por ejemplo `1701 FACE - RONALDINHO (PES5 Xbox).bin`): se copia encima con el
   nombre del índice. También puedes reemplazarlos con un explorador de archivos, siempre que
   el nuevo tenga el nombre del índice. **Crear AFS** pide dónde guardar el AFS nuevo.
+
+La lista de «Crear AFS» tiene un buscador arriba: escribe el número del archivo (1701 o 01701) y solo se
+ve ese; si escribes pocas cifras, primero salen los números exactos y luego los que empiezan por ellas.
+No hace falta deslizar entre miles de archivos.
 
 **Modo rápido (casilla en «Crear AFS»):** no hace falta extraer. Marca la casilla, **Buscar** el AFS
 original y toca solo los archivos que quieras reemplazar (puedes quitar un reemplazo desde el mismo
