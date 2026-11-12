@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Dibuja desde cero el logo de la app (icono.png). No usa ninguna imagen: todo se genera por codigo.
+"""Dibuja desde cero el logo de la app (icono.png), minimalista. No usa ninguna imagen.
 
 Uso (desde la raiz del repositorio):  python3 tools/make_logo.py
 Necesita: pip install pillow numpy scipy
 
 Despues, para crear los iconos de Android:  python3 tools/make_icons.py icono.png
 
-Logo: un 5 amarillo italico con borde negro y plateado (estilo PES 5) y la esfera verde de Xbox,
-sobre fondo negro con una curva verde. Salida: 1254x1254, esquinas redondeadas sobre blanco
-(es el formato que espera make_icons.py).
+Logo: circulo verde estilo Xbox con borde blanco, las formas de la X de Xbox en blanco
+(transparentes) al fondo y un 5 amarillo italico estilo PES 5 delante.
+Salida: 1254x1254, circulo sobre blanco (es el formato que espera make_icons.py).
 """
-import math
 import os
 
 import numpy as np
@@ -19,31 +18,12 @@ from scipy import ndimage as ndi
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 W = 1254
-CORNER = 230
+C = W / 2
 
-
-# ------------------------------------------------------------------ utilidades
-
-def rounded_mask(size, radius):
-    big = 4
-    m = Image.new("L", (size * big, size * big), 0)
-    ImageDraw.Draw(m).rounded_rectangle((0, 0, size * big - 1, size * big - 1), radius * big, fill=255)
-    return m.resize((size, size), Image.LANCZOS)
-
-
-def vgradient(w, h, top, bottom):
-    t = np.linspace(0, 1, h)[:, None, None]
-    row = np.array(top, float) + (np.array(bottom, float) - np.array(top, float)) * t
-    return Image.fromarray(np.repeat(row, w, axis=1).astype("uint8"), "RGB")
-
-
-def glow(size, center, radius, color, strength):
-    y, x = np.mgrid[0:size, 0:size]
-    d = np.sqrt((x - center[0]) ** 2 + (y - center[1]) ** 2) / radius
-    a = np.clip(1 - d, 0, 1) ** 2 * strength
-    layer = Image.new("RGBA", (size, size), color + (0,))
-    layer.putalpha(Image.fromarray((a * 255).astype("uint8"), "L"))
-    return layer
+GREEN_CENTER = (46, 178, 40)     # verde Xbox, mas claro en el centro
+GREEN_EDGE = (14, 112, 20)
+YELLOW = (255, 214, 20)
+OUTLINE = (5, 58, 10)            # verde muy oscuro, casi negro
 
 
 def smooth_edges(mask, radius, hardness=10):
@@ -60,23 +40,43 @@ def dilate(mask, px, blur=1.2):
     return Image.fromarray((d * 255).astype("uint8"), "L").filter(ImageFilter.GaussianBlur(blur))
 
 
-def paste_with_shadow(base, layer, center, dy=16, blur=14, opacity=0.8):
-    x, y = int(center[0] - layer.width / 2), int(center[1] - layer.height / 2)
-    m = Image.new("L", base.size, 0)
-    m.paste(layer.getchannel("A"), (x + 4, y + dy))
-    m = m.filter(ImageFilter.GaussianBlur(blur)).point(lambda v: int(v * opacity))
-    sh = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    sh.putalpha(m)
-    base.alpha_composite(sh)
-    tmp = Image.new("RGBA", base.size, (0, 0, 0, 0))
-    tmp.paste(layer, (x, y), layer)
-    base.alpha_composite(tmp)
+def disc(size, cx, cy, r, ss=4):
+    m = Image.new("L", (size * ss, size * ss), 0)
+    ImageDraw.Draw(m).ellipse(((cx - r) * ss, (cy - r) * ss, (cx + r) * ss, (cy + r) * ss), fill=255)
+    return m.resize((size, size), Image.LANCZOS)
 
 
-# ------------------------------------------------------------------ el 5
+def radial_background():
+    y, x = np.mgrid[0:W, 0:W]
+    d = np.clip(np.sqrt((x - C) ** 2 + (y - C + 80) ** 2) / (W * 0.62), 0, 1)
+    a, b = np.array(GREEN_CENTER, float), np.array(GREEN_EDGE, float)
+    return Image.fromarray((a + (b - a) * d[..., None]).astype("uint8"), "RGB")
+
+
+def bezier(p0, p1, p2, n=1200):
+    t = np.linspace(0, 1, n)[:, None]
+    return (1 - t) ** 2 * np.array(p0) + 2 * (1 - t) * t * np.array(p1) + t ** 2 * np.array(p2)
+
+
+def x_shapes(radius, ss=2):
+    """Las dos bandas curvas cruzadas de la X de Xbox, como mascara 'L' del tamaño del icono."""
+    S = W * ss
+    m = Image.new("L", (S, S), 0)
+    d = ImageDraw.Draw(m)
+    bow = 0.20
+    strokes = [((-1.05, -1.1), (bow, -bow), (1.05, 1.1)),
+               ((1.05, -1.1), (-bow, -bow), (-1.05, 1.1))]
+    for p0, p1, p2 in strokes:
+        for i, (px, py) in enumerate(bezier(p0, p1, p2)):
+            t = i / 1199
+            hw = (0.17 + 0.10 * abs(2 * t - 1) ** 1.3) * radius * ss
+            cx, cy = C * ss + px * radius * ss, C * ss + py * radius * ss
+            d.ellipse((cx - hw, cy - hw, cx + hw, cy + hw), fill=255)
+    return m.resize((W, W), Image.LANCZOS)
+
 
 def five_layer(height):
-    """Un 5 amarillo italico con borde negro y plateado, de 'height' px de alto (sin borde)."""
+    """Un 5 amarillo italico de 'height' px de alto con borde oscuro, estilo PES 5."""
     ss = 2
     cw, ch = 760 * ss, 900 * ss
     m = Image.new("L", (cw, ch), 0)
@@ -88,139 +88,64 @@ def five_layer(height):
     r(80, 40, 640, 180)            # barra de arriba
     r(80, 40, 230, 440)            # palo de la izquierda
     r(80, 300, 430, 440)           # barra del medio
-    # panza: anillo grueso, abierto por la izquierda entre la barra del medio y la cola
-    bowl = Image.new("L", (cw, ch), 0)
+    bowl = Image.new("L", (cw, ch), 0)   # panza: anillo grueso abierto por la izquierda
     bd = ImageDraw.Draw(bowl)
     bd.ellipse((130 * ss, 300 * ss, 690 * ss, 880 * ss), fill=255)
     bd.ellipse((270 * ss, 440 * ss, 550 * ss, 740 * ss), fill=0)
     bd.rectangle((0, 445 * ss, 410 * ss, 690 * ss), fill=0)
     m = ImageChops.lighter(m, bowl)
     m = smooth_edges(m, 6 * ss, 8)
-    # italica: la parte de arriba se corre a la derecha
-    k = 0.30
+    k = 0.30                              # italica
     m = m.transform((cw + int(k * ch), ch), Image.AFFINE, (1, k, -k * ch, 0, 1, 0), Image.BICUBIC)
-    bbox = m.getbbox()
-    m = m.crop(bbox)
+    m = m.crop(m.getbbox())
     s = height * ss / m.height
     m = m.resize((round(m.width * s / ss), round(m.height * s / ss)), Image.LANCZOS)
 
-    # relleno amarillo con brillo arriba y borde inferior mas oscuro
-    fill = vgradient(m.width, m.height, (255, 244, 70), (255, 188, 0)).convert("RGBA")
-    gloss = Image.new("RGBA", fill.size, (255, 255, 255, 0))
-    ga = np.zeros((fill.height, fill.width))
-    ga[: int(fill.height * 0.38)] = 0.22
-    gloss.putalpha(Image.fromarray((ga * 255).astype("uint8"), "L"))
-    fill.alpha_composite(gloss)
-    fill.putalpha(m)
-
-    # bordes: negro grueso y plateado fino por fuera
-    black_px, silver_px = 26, 11
-    pad = black_px + silver_px + 20
-    canvas_m = Image.new("L", (m.width + 2 * pad, m.height + 2 * pad), 0)
-    canvas_m.paste(m, (pad, pad))
-    out = Image.new("RGBA", canvas_m.size, (0, 0, 0, 0))
-    plate = vgradient(out.width, out.height, (255, 255, 255), (150, 160, 170)).convert("RGBA")
-    plate.putalpha(dilate(canvas_m, black_px + silver_px))
-    out.alpha_composite(plate)
-    black = Image.new("RGBA", out.size, (4, 4, 4, 255))
-    black.putalpha(dilate(canvas_m, black_px))
-    out.alpha_composite(black)
-    out.alpha_composite(fill, (pad, pad))
+    outline_px = 24
+    pad = outline_px + 20
+    canvas = Image.new("L", (m.width + 2 * pad, m.height + 2 * pad), 0)
+    canvas.paste(m, (pad, pad))
+    out = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    edge = Image.new("RGBA", canvas.size, OUTLINE + (255,))
+    edge.putalpha(dilate(canvas, outline_px))
+    out.alpha_composite(edge)
+    fill = Image.new("RGBA", canvas.size, YELLOW + (255,))
+    fill.putalpha(canvas)
+    out.alpha_composite(fill)
     return out
 
 
-# ------------------------------------------------------------------ la esfera de Xbox
-
-def bezier(p0, p1, p2, n=900):
-    t = np.linspace(0, 1, n)[:, None]
-    return (1 - t) ** 2 * np.array(p0) + 2 * (1 - t) * t * np.array(p1) + t ** 2 * np.array(p2)
-
-
-def ball_layer(d):
-    """Esfera plateada con la X verde de Xbox y aro oscuro, de 'd' px de diametro (con el aro)."""
-    ss = 3
-    S = d * ss
-    c = S / 2
-    R = S / 2 - 2
-    y, x = np.mgrid[0:S, 0:S]
-    dx, dy = (x - c) / R, (y - c) / R
-    r2 = dx * dx + dy * dy
-
-    # la X: dos trazos curvos que se cruzan en el centro; arriba se juntan mas que abajo
-    xm = Image.new("L", (S, S), 0)
-    xd = ImageDraw.Draw(xm)
-    bow = 0.20
-    strokes = [((-0.78, -0.86), (bow, -bow), (0.78, 0.86)),
-               ((0.78, -0.86), (-bow, -bow), (-0.78, 0.86))]
-    for p0, p1, p2 in strokes:
-        pts = bezier(p0, p1, p2)
-        for i, (px, py) in enumerate(pts):
-            t = i / (len(pts) - 1)
-            hw = (0.165 + 0.095 * abs(2 * t - 1) ** 1.3) * R
-            cx, cy = c + px * R, c + py * R
-            xd.ellipse((cx - hw, cy - hw, cx + hw, cy + hw), fill=255)
-    xmask = np.asarray(xm.filter(ImageFilter.GaussianBlur(ss * 0.7)), float) / 255
-
-    # plata: luz arriba a la izquierda
-    dist = np.sqrt((dx + 0.35) ** 2 + (dy + 0.45) ** 2)
-    shade = np.clip(1 - dist / 1.6, 0, 1)
-    silver = np.array([118, 124, 132]) + shade[..., None] * np.array([137, 131, 123])
-    # verde: mas claro hacia el centro
-    gl = np.clip(1 - np.sqrt(dx * dx + (dy - 0.05) ** 2) / 0.9, 0, 1)
-    green = np.array([22, 128, 8]) + gl[..., None] ** 1.3 * np.array([135, 120, 70])
-    img = silver * (1 - xmask[..., None]) + green * xmask[..., None]
-    # forma de esfera: bordes mas oscuros y brillo
-    img *= (1 - 0.40 * np.clip(r2, 0, 1) ** 3)[..., None]
-    spec = np.exp(-(((dx + 0.30) ** 2) / 0.10 + ((dy + 0.62) ** 2) / 0.018)) * 0.55
-    img = img + (255 - img) * spec[..., None]
-    img = np.clip(img, 0, 255)
-
-    inside = (r2 <= 1.0).astype(float)
-    face = Image.fromarray(np.dstack([img, inside * 255]).astype("uint8"), "RGBA")
-
-    # aro: plata por fuera y negro por dentro
-    ring = round(0.06 * S)
-    full = Image.new("RGBA", (S, S), (0, 0, 0, 0))
-    outer = Image.new("L", (S, S), 0)
-    ImageDraw.Draw(outer).ellipse((0, 0, S - 1, S - 1), fill=255)
-    metal = vgradient(S, S, (240, 244, 248), (70, 78, 86)).convert("RGBA")
-    metal.putalpha(outer)
-    full.alpha_composite(metal)
-    dark_m = Image.new("L", (S, S), 0)
-    ImageDraw.Draw(dark_m).ellipse((S * 0.02, S * 0.02, S * 0.98, S * 0.98), fill=255)
-    dark = Image.new("RGBA", (S, S), (6, 8, 6, 255))
-    dark.putalpha(dark_m)
-    full.alpha_composite(dark)
-    inner = face.resize((S - 2 * ring, S - 2 * ring), Image.LANCZOS)
-    full.alpha_composite(inner, (ring, ring))
-    return full.resize((d, d), Image.LANCZOS)
-
-
-# ------------------------------------------------------------------ fondo
-
-def swoosh(size):
-    big = 2
-    layer = Image.new("L", (size * big, size * big), 0)
-    dr = ImageDraw.Draw(layer)
-    dr.ellipse((-330 * big, 520 * big, 1584 * big, 1215 * big), fill=255)
-    dr.ellipse((-290 * big, 488 * big, 1544 * big, 1160 * big), fill=0)
-    layer = layer.resize((size, size), Image.LANCZOS)
-    ImageDraw.Draw(layer).rectangle((0, 0, size, 860), fill=0)
-    col = vgradient(size, size, (150, 240, 55), (28, 125, 14)).convert("RGBA")
-    col.putalpha(layer)
-    return col
-
-
 def main():
-    base = vgradient(W, W, (3, 6, 3), (8, 22, 8)).convert("RGBA")
-    base.alpha_composite(glow(W, (420, 760), 700, (60, 200, 30), 0.35))
-    base.alpha_composite(swoosh(W))
+    inner_r = C - 2
+    # circulo verde con la X de Xbox en blanco (transparente)
+    art = radial_background().convert("RGBA")
+    white = Image.new("RGBA", (W, W), (255, 255, 255, 255))
+    inside_ring = disc(W, C, C, C * 0.93 - 40)      # las formas no pasan del borde blanco
+    xa = ImageChops.multiply(x_shapes(C).point(lambda v: int(v * 0.30)), inside_ring)
+    white.putalpha(xa)
+    art.alpha_composite(white)
 
-    paste_with_shadow(base, five_layer(740), (690, 470))
-    paste_with_shadow(base, ball_layer(500), (285, 890))
+    # borde blanco del circulo, un poco hacia dentro (el verde queda por fuera)
+    ring = ImageChops.subtract(disc(W, C, C, C * 0.93), disc(W, C, C, C * 0.93 - 40))
+    ringl = Image.new("RGBA", (W, W), (255, 255, 255, 255))
+    ringl.putalpha(ring)
+    art.alpha_composite(ringl)
+
+    # el 5 amarillo, con una sombra suave
+    five = five_layer(640)
+    x, y = int(C - five.width / 2 + 10), int(C - five.height / 2 - 6)
+    sh = Image.new("L", (W, W), 0)
+    sh.paste(five.getchannel("A"), (x + 4, y + 18))
+    sh = sh.filter(ImageFilter.GaussianBlur(16)).point(lambda v: int(v * 0.55))
+    shl = Image.new("RGBA", (W, W), (0, 20, 0, 255))
+    shl.putalpha(sh)
+    art.alpha_composite(shl)
+    tmp = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    tmp.paste(five, (x, y), five)
+    art.alpha_composite(tmp)
 
     final = Image.new("RGB", (W, W), (255, 255, 255))
-    final.paste(base.convert("RGB"), (0, 0), rounded_mask(W, CORNER))
+    final.paste(art.convert("RGB"), (0, 0), disc(W, C, C, inner_r))
     out = os.path.join(ROOT, "icono.png")
     final.save(out)
     print("Logo guardado en", out)
