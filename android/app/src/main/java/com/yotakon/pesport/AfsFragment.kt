@@ -25,10 +25,12 @@ import com.yotakon.pesport.core.Afs
 import com.yotakon.pesport.core.AfsFolder
 import com.yotakon.pesport.core.AfsWriter
 import com.yotakon.pesport.core.ConversionException
+import com.yotakon.pesport.core.Parallel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.BufferedOutputStream
+import java.util.concurrent.atomic.AtomicInteger
 import java.io.FileInputStream
 import java.io.IOException
 import java.util.Locale
@@ -214,21 +216,20 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
                         val info = AfsFolder.Info(n, afs.headerSize(), sizes, srcName)
                         val infoDoc = Saf.createDocument(ctx.contentResolver, dir, "text/plain", AfsFolder.INFO_NAME)
                         Saf.openOut(ctx, infoDoc).use { o -> o.write(info.serialize().toByteArray(Charsets.UTF_8)) }
-                        val buf = ByteArray(1 shl 20)
-                        var written = 0
-                        var empty = 0
-                        for (i in 0 until n) {
-                            if (sizes[i] == 0L) {
-                                empty++
-                            } else {
-                                val doc = Saf.createDocument(ctx.contentResolver, dir, "application/octet-stream",
-                                    AfsFolder.entryName(i, n))
-                                BufferedOutputStream(Saf.openOut(ctx, doc), 1 shl 16).use { o -> afs.copyTo(i, o, buf) }
-                                written++
-                            }
-                            if ((i + 1) % 250 == 0) log("  ${i + 1} de $n…")
+                        // Crear cada archivo en la carpeta tarda mucho más que copiarlo: se hace en
+                        // varios hilos a la vez (la lectura del AFS por posiciones es segura).
+                        val todo = (0 until n).filter { i -> sizes[i] > 0 }
+                        val empty = n - todo.size
+                        val written = AtomicInteger(0)
+                        val buffers = ThreadLocal.withInitial { ByteArray(256 * 1024) }
+                        Parallel.forEach(todo) { i ->
+                            val doc = Saf.createDocument(ctx.contentResolver, dir, "application/octet-stream",
+                                AfsFolder.entryName(i, n))
+                            Saf.openOut(ctx, doc).use { o -> afs.copyTo(i, o, buffers.get()!!) }
+                            val k = written.incrementAndGet()
+                            if (k % 250 == 0) log("  $k de ${todo.size}…")
                         }
-                        log("Listo: $written archivos" + (if (empty > 0) " ($empty vacíos, sin archivo)" else "") + ".")
+                        log("Listo: ${written.get()} archivos" + (if (empty > 0) " ($empty vacíos, sin archivo)" else "") + ".")
                         Result.success(Folder(tree, DocumentsContract.getDocumentId(dir)))
                     }
                 } catch (e: Exception) {
@@ -430,6 +431,7 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
                             o, plan.sizes, plan.header,
                             open = { i -> Saf.openIn(ctx, folder.child(plan.entries[i]!!.ref)) },
                             progress = { done, total -> if (done % 250 == 0 || done == total) status("Creando el AFS: $done de $total…") },
+                            prefetch = Parallel.IO_THREADS,
                         )
                     }
                 }

@@ -29,6 +29,7 @@ import com.yotakon.pesport.core.Afs
 import com.yotakon.pesport.core.Converter
 import com.yotakon.pesport.core.FaceHair
 import com.yotakon.pesport.core.Pairs
+import com.yotakon.pesport.core.Parallel
 import com.yotakon.pesport.core.PlayerDb
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,6 +38,7 @@ import java.io.FileInputStream
 import java.io.IOException
 import java.util.Locale
 import java.util.TreeMap
+import java.util.concurrent.atomic.AtomicInteger
 import com.google.android.material.R as MR
 
 /**
@@ -232,17 +234,22 @@ class FacesFragment : Fragment(R.layout.fragment_faces) {
                     val channel = FileInputStream(pfd.fileDescriptor).channel
                     val size = channel.size()
                     val a = Afs.open(channel)
+                    // Cada archivo se descomprime un poco para saber si es FACE o HAIR: se reparte entre hilos.
+                    val kinds = arrayOfNulls<FaceHair.Kind>(a.count())
+                    val checked = AtomicInteger(0)
+                    Parallel.forEach((0 until a.count()).toList(), Runtime.getRuntime().availableProcessors().coerceIn(2, 8)) { i ->
+                        if (a.size(i) >= 32) kinds[i] = FaceHair.classify(a.readHead(i, FaceHair.HEAD_BYTES))
+                        val k = checked.incrementAndGet()
+                        if (k % 2000 == 0) log("Revisados $k de ${a.count()}…")
+                    }
                     val f = ArrayList<Int>()
                     val h = ArrayList<Int>()
-                    for (i in 0 until a.count()) {
-                        if (a.size(i) >= 32) {
-                            when (FaceHair.classify(a.readHead(i, FaceHair.HEAD_BYTES))) {
-                                FaceHair.Kind.FACE -> f.add(i)
-                                FaceHair.Kind.HAIR -> h.add(i)
-                                null -> {}
-                            }
+                    for (i in kinds.indices) {
+                        when (kinds[i]) {
+                            FaceHair.Kind.FACE -> f.add(i)
+                            FaceHair.Kind.HAIR -> h.add(i)
+                            null -> {}
                         }
-                        if ((i + 1) % 2000 == 0) log("Revisados ${i + 1} de ${a.count()}…")
                     }
                     val key = "overrides_${a.count()}_$size"
                     var players: List<PlayerDb.Player> = emptyList()
@@ -462,39 +469,40 @@ class FacesFragment : Fragment(R.layout.fragment_faces) {
         log("Extrayendo en ${Saf.folderLabel(tree)}/$OUT_DIR…")
         viewLifecycleOwner.lifecycleScope.launch {
             val msg = withContext(Dispatchers.IO) {
-                var nf = 0
-                var nh = 0
-                var lone = 0
+                val nf = AtomicInteger(0)
+                val nh = AtomicInteger(0)
+                val lone = AtomicInteger(0)
                 var error: String? = null
                 try {
                     val dir = Saf.createDir(ctx, Saf.treeRoot(tree), OUT_DIR)
                     log("Carpeta: " + Saf.displayName(ctx, dir))
-                    var done = 0
-                    val total = f.size + h.size
+                    // Lista de archivos a escribir: (nombre, archivo del AFS, contador). Crearlos en
+                    // la carpeta es lo lento, así que se hace en varios hilos a la vez.
+                    class Job(val name: String, val slot: Int, val counter: AtomicInteger)
+                    val jobs = ArrayList<Job>()
                     for (face in f) {
                         val player = pr.names(face).firstOrNull()
-                        Saf.writeNew(ctx, dir, Pairs.faceName(face, player), a.read(face))
-                        nf++
+                        jobs.add(Job(Pairs.faceName(face, player), face, nf))
                         val hair = pr.hairFor(face)
-                        if (hair != Pairs.NONE) {
-                            Saf.writeNew(ctx, dir, Pairs.hairName(face, hair, player), a.read(hair))
-                            nh++
-                        }
-                        if (++done % 200 == 0) log("  $done de $total…")
+                        if (hair != Pairs.NONE) jobs.add(Job(Pairs.hairName(face, hair, player), hair, nh))
                     }
                     for (hair in h) {
-                        if (!pr.isHairUsed(hair)) {
-                            Saf.writeNew(ctx, dir, Pairs.loneHairName(hair), a.read(hair))
-                            lone++
-                        }
-                        if (++done % 200 == 0) log("  $done de $total…")
+                        if (!pr.isHairUsed(hair)) jobs.add(Job(Pairs.loneHairName(hair), hair, lone))
+                    }
+                    val done = AtomicInteger(0)
+                    Parallel.forEach(jobs.indices.toList()) { k ->
+                        val j = jobs[k]
+                        Saf.writeNew(ctx, dir, j.name, a.read(j.slot))
+                        j.counter.incrementAndGet()
+                        val d = done.incrementAndGet()
+                        if (d % 200 == 0) log("  $d de ${jobs.size}…")
                     }
                 } catch (e: Exception) {
                     error = e.message
                 }
                 String.format(
                     Locale.getDefault(), "%s FACES: %d · HAIRS con su FACE: %d · HAIRS sin FACE: %d",
-                    if (error == null) "Listo." else "Error: $error.", nf, nh, lone
+                    if (error == null) "Listo." else "Error: $error.", nf.get(), nh.get(), lone.get()
                 )
             }
             log(msg)

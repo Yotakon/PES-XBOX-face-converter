@@ -5,6 +5,10 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 /**
  * Archivo AFS (por ejemplo 0_text.afs): "AFS\0", u32 número de archivos y tabla de
@@ -148,6 +152,10 @@ object AfsWriter {
     /**
      * Escribe el AFS en [out]. [open] abre el archivo i (solo se llama si su tamaño es > 0); se
      * comprueba que cada archivo tenga exactamente el tamaño anunciado en [sizes].
+     *
+     * Abrir un archivo de una carpeta de Android tarda mucho más que copiarlo, así que con
+     * [prefetch] > 1 se abren por adelantado los siguientes archivos en otros hilos mientras se
+     * copia el actual. El AFS se escribe siempre en orden, con el mismo resultado.
      */
     fun write(
         out: OutputStream,
@@ -155,32 +163,64 @@ object AfsWriter {
         minHeader: Long,
         open: (Int) -> InputStream,
         progress: (done: Int, total: Int) -> Unit = { _, _ -> },
+        prefetch: Int = 1,
     ): Layout {
         val layout = layout(sizes, minHeader)
         out.write(header(sizes, layout))
         var pos = layout.header
         val buf = ByteArray(1 shl 20)
-        for (i in sizes.indices) {
-            if (sizes[i] > 0) {
-                var copied = 0L
-                open(i).use { input ->
-                    while (true) {
-                        val r = input.read(buf)
-                        if (r < 0) break
-                        copied += r
-                        if (copied > sizes[i]) break
-                        out.write(buf, 0, r)
+        val pool = if (prefetch > 1) Executors.newFixedThreadPool(prefetch) else null
+        val opened = arrayOfNulls<Future<InputStream>>(sizes.size)
+        var submitted = -1
+        fun submitThrough(last: Int) {
+            while (pool != null && submitted < minOf(last, sizes.size - 1)) {
+                submitted++
+                val k = submitted
+                if (sizes[k] > 0) opened[k] = pool.submit(Callable { open(k) })
+            }
+        }
+        try {
+            for (i in sizes.indices) {
+                if (sizes[i] > 0) {
+                    submitThrough(i + prefetch)
+                    val stream = try {
+                        opened[i]?.get() ?: open(i)
+                    } catch (e: ExecutionException) {
+                        throw e.cause ?: e
+                    }
+                    opened[i] = null
+                    var copied = 0L
+                    stream.use { input ->
+                        while (true) {
+                            val r = input.read(buf)
+                            if (r < 0) break
+                            copied += r
+                            if (copied > sizes[i]) break
+                            out.write(buf, 0, r)
+                        }
+                    }
+                    if (copied != sizes[i]) {
+                        throw IOException("el archivo $i ha cambiado de tamaño mientras se creaba el AFS")
+                    }
+                    pos += copied
+                    val end = pad(pos)
+                    writeZeros(out, end - pos, buf)
+                    pos = end
+                }
+                progress(i + 1, sizes.size)
+            }
+        } finally {
+            pool?.shutdownNow()
+            // Cierra los archivos abiertos por adelantado que ya no se van a usar.
+            for (f in opened) {
+                if (f != null && f.isDone && !f.isCancelled) {
+                    try {
+                        f.get().close()
+                    } catch (ignored: Exception) {
+                        // ya no importa
                     }
                 }
-                if (copied != sizes[i]) {
-                    throw IOException("el archivo $i ha cambiado de tamaño mientras se creaba el AFS")
-                }
-                pos += copied
-                val end = pad(pos)
-                writeZeros(out, end - pos, buf)
-                pos = end
             }
-            progress(i + 1, sizes.size)
         }
         return layout
     }
