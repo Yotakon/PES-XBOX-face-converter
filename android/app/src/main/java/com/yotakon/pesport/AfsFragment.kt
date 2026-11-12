@@ -3,6 +3,7 @@ package com.yotakon.pesport
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import android.provider.DocumentsContract
 import android.view.LayoutInflater
 import android.view.View
@@ -16,6 +17,7 @@ import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.progressindicator.LinearProgressIndicator
@@ -42,12 +44,22 @@ import com.google.android.material.R as MR
  *   junto con [AfsFolder.INFO_NAME] (número de archivos, cabecera y tamaños originales).
  * - Crear: lista la carpeta, deja reemplazar archivos (también por otros más grandes) y crea un
  *   AFS nuevo para PES 5 con todos los archivos en su sitio.
+ *   Con el «modo rápido» no se extrae nada: se usa el AFS original directamente y solo se eligen
+ *   los archivos a reemplazar; el resto se lee del original al crear el AFS nuevo.
  */
 class AfsFragment : Fragment(R.layout.fragment_afs) {
     /** Fila de la lista de la subpestaña Crear: un índice del AFS. */
-    private class Entry(val index: Int, val name: String, var child: Saf.Child?, var size: Long, val original: Long)
+    private class Entry(val index: Int, val name: String, var child: Saf.Child?, var size: Long, val original: Long) {
+        /** Modo rápido: archivo que sustituye al del AFS original. */
+        var repl: Repl? = null
+    }
 
-    private class Scan(val info: AfsFolder.Info?, val entries: List<Entry>, val ignored: Int, val summary: String)
+    private class Repl(val uri: Uri, val name: String)
+
+    private class Scan(
+        val info: AfsFolder.Info?, val entries: List<Entry>, val ignored: Int, val summary: String,
+        val fast: Boolean = false,
+    )
 
     private lateinit var progress: LinearProgressIndicator
     private lateinit var srcText: TextView
@@ -59,19 +71,31 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
     private lateinit var buildSummary: TextView
     private lateinit var buildButton: MaterialButton
     private lateinit var tabs: TabLayout
+    private lateinit var fastCheck: MaterialCheckBox
+    private lateinit var fastHint: View
+    private lateinit var cardFastAfs: View
+    private lateinit var cardBuildFolder: View
+    private lateinit var fastAfsText: TextView
     private val adapter = EntryAdapter()
 
     private var srcAfs: Uri? = null
     private var dstTree: Uri? = null
     private var buildFolder: Folder? = null
     private var scan: Scan? = null
+
+    // modo rápido
+    private var fastMode = false
+    private var fastPfd: ParcelFileDescriptor? = null
+    private var fastAfs: Afs? = null
+    private var fastName = ""
+    private var fastScan: Scan? = null
     private var scanSummary = ""
     private var busy = false
 
     /** Archivo que se va a reemplazar (índice de la lista) mientras el usuario elige el nuevo. */
     private var replacing = -1
-    /** Carpeta revisada y lista para escribir mientras el usuario elige dónde guardar el AFS. */
-    private var pendingBuild: Pair<Folder, AfsFolder.Plan<String>>? = null
+    /** Qué escribir cuando el usuario elija dónde guardar el AFS nuevo. */
+    private var pendingWrite: ((Uri) -> Unit)? = null
 
     private val pickSrc = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -103,9 +127,13 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
     }
 
     private val createAfs = registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
-        val job = pendingBuild
-        pendingBuild = null
-        if (uri != null && job != null) writeAfs(job.first, job.second, uri)
+        val job = pendingWrite
+        pendingWrite = null
+        if (uri != null && job != null) job(uri)
+    }
+
+    private val pickFastAfs = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) openFastAfs(uri)
     }
 
     private fun prefs() = requireContext().getSharedPreferences(ConvertFragment.PREFS, Context.MODE_PRIVATE)
@@ -137,6 +165,15 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
         view.findViewById<View>(R.id.pick_src_afs).setOnClickListener { if (!busy) pickSrc.launch(arrayOf("*/*")) }
         view.findViewById<View>(R.id.pick_dst_folder).setOnClickListener { if (!busy) pickDst.launch(null) }
         view.findViewById<View>(R.id.pick_build_folder).setOnClickListener { if (!busy) pickBuildFolder.launch(null) }
+        view.findViewById<View>(R.id.pick_fast_afs).setOnClickListener { if (!busy) pickFastAfs.launch(arrayOf("*/*")) }
+        fastCheck = view.findViewById(R.id.fast_mode)
+        fastHint = view.findViewById(R.id.fast_hint)
+        cardFastAfs = view.findViewById(R.id.card_fast_afs)
+        cardBuildFolder = view.findViewById(R.id.card_build_folder)
+        fastAfsText = view.findViewById(R.id.fast_afs_name)
+        fastCheck.setOnCheckedChangeListener { _, on ->
+            if (!busy) setFastMode(on) else fastCheck.isChecked = fastMode
+        }
         extractButton.setOnClickListener { extract() }
         buildButton.setOnClickListener { prepareBuild() }
 
@@ -149,6 +186,98 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
         buildFolder = Folder.parse(prefs().getString(KEY_BUILD, null))
         refreshLabels()
         buildFolder?.let(::rescan)
+        fastMode = prefs().getBoolean(KEY_FAST, false)
+        fastCheck.isChecked = fastMode
+        applyMode()
+    }
+
+    override fun onDestroy() {
+        closeFast()
+        super.onDestroy()
+    }
+
+    private fun closeFast() {
+        try {
+            fastPfd?.close()
+        } catch (ignored: IOException) {
+            // nada que hacer
+        }
+        fastPfd = null
+        fastAfs = null
+    }
+
+    // ------------------------------------------------------------ modo rápido
+
+    private fun setFastMode(on: Boolean) {
+        fastMode = on
+        prefs().edit().putBoolean(KEY_FAST, on).apply()
+        applyMode()
+    }
+
+    /** Enseña la tarjeta que toca (AFS original o carpeta) y la lista del modo activo. */
+    private fun applyMode() {
+        fastHint.visibility = if (fastMode) View.VISIBLE else View.GONE
+        cardFastAfs.visibility = if (fastMode) View.VISIBLE else View.GONE
+        cardBuildFolder.visibility = if (fastMode) View.GONE else View.VISIBLE
+        adapter.notifyDataSetChanged()
+        refreshSummary()
+    }
+
+    private fun current(): Scan? = if (fastMode) fastScan else scan
+
+    private fun refreshSummary() {
+        scanSummary = if (fastMode) fastSummary() else (scan?.summary ?: getString(R.string.afs_build_empty))
+        status(null)
+    }
+
+    private fun fastSummary(): String {
+        val s = fastScan ?: return getString(R.string.afs_fast_empty)
+        val replaced = s.entries.count { it.repl != null }
+        val total = s.entries.sumOf { maxOf(0L, it.size) }
+        return buildString {
+            append(String.format(Locale.getDefault(), "Archivos: %d · %s · original: %s", s.entries.size, sizeText(total), fastName))
+            if (replaced > 0) append("\nReemplazados: $replaced")
+            append("\nToca un archivo para reemplazarlo. El AFS original no se modifica.")
+        }
+    }
+
+    private fun openFastAfs(uri: Uri) {
+        setBusy(true)
+        val ctx = requireContext().applicationContext
+        val name = Saf.displayName(ctx, uri, "AFS")
+        fastAfsText.text = name
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                var pfd: ParcelFileDescriptor? = null
+                try {
+                    pfd = ctx.contentResolver.openFileDescriptor(uri, "r") ?: throw IOException("no se pudo abrir")
+                    val afs = Afs.open(FileInputStream(pfd.fileDescriptor).channel)
+                    val n = afs.count()
+                    val entries = (0 until n).map { i -> Entry(i, AfsFolder.entryName(i, n), null, afs.size(i), afs.size(i)) }
+                    Result.success(Triple(pfd, afs, Scan(null, entries, 0, "", fast = true)))
+                } catch (e: Exception) {
+                    try {
+                        pfd?.close()
+                    } catch (ignored: IOException) {
+                        // nada que hacer
+                    }
+                    Result.failure(e)
+                }
+            }
+            setBusy(false)
+            result.onSuccess { (pfd, afs, sc) ->
+                closeFast()
+                fastPfd = pfd
+                fastAfs = afs
+                fastName = name
+                fastScan = sc
+                adapter.notifyDataSetChanged()
+                refreshSummary()
+            }.onFailure { e ->
+                fastAfsText.text = getString(R.string.none_chosen)
+                message(getString(R.string.afs_cannot_build, e.message ?: e.toString()))
+            }
+        }
     }
 
     private fun setBusy(b: Boolean) {
@@ -255,21 +384,25 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
 
     private fun rescan(folder: Folder) {
         setBusy(true)
-        scanSummary = getString(R.string.afs_reading_folder)
-        status(null)
+        if (!fastMode) {
+            scanSummary = getString(R.string.afs_reading_folder)
+            status(null)
+        }
         val ctx = requireContext().applicationContext
         viewLifecycleOwner.lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) { runCatching { scanFolder(ctx, folder) } }
             result.onSuccess { s ->
                 scan = s
-                scanSummary = s.summary
-                adapter.notifyDataSetChanged()
-                status(null)
+                if (!fastMode) adapter.notifyDataSetChanged()
+                refreshSummary()
             }.onFailure { e ->
                 scan = null
-                adapter.notifyDataSetChanged()
-                scanSummary = "Error: ${e.message}"
-                status(null)
+                if (!fastMode) adapter.notifyDataSetChanged()
+                refreshSummary()
+                if (!fastMode) {
+                    scanSummary = "Error: ${e.message}"
+                    status(null)
+                }
             }
             setBusy(false)
         }
@@ -330,12 +463,39 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
     }
 
     private fun confirmReplace(pos: Int, uri: Uri) {
-        val s = scan ?: return
-        val folder = buildFolder ?: return
+        val s = current() ?: return
         val e = s.entries.getOrNull(pos) ?: return
         val ctx = requireContext()
         val newName = Saf.displayName(ctx, uri)
-        val newSize = Saf.size(ctx, uri)
+        var newSize = Saf.size(ctx, uri)
+        if (s.fast) {
+            if (newSize < 0) {
+                newSize = try {
+                    ctx.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: -1
+                } catch (ex: Exception) {
+                    -1
+                }
+            }
+            if (newSize < 0) {
+                message(getString(R.string.afs_cannot_build, "no se pudo saber el tamaño de «$newName»"))
+                return
+            }
+            val size = newSize
+            val builder = MaterialAlertDialogBuilder(ctx)
+                .setTitle(R.string.afs_replace_title)
+                .setMessage(getString(R.string.afs_replace_confirm_fast, e.name, sizeText(e.size), newName, sizeText(size)))
+                .setPositiveButton(R.string.afs_replace) { _, _ ->
+                    e.repl = Repl(uri, newName)
+                    e.size = size
+                    adapter.notifyItemChanged(pos)
+                    refreshSummary()
+                }
+                .setNegativeButton(R.string.cancel, null)
+            if (e.repl != null) builder.setNeutralButton(R.string.afs_remove_replacement) { _, _ -> removeReplacement(pos) }
+            builder.show()
+            return
+        }
+        val folder = buildFolder ?: return
         val now = if (e.child != null) sizeText(e.size) else getString(R.string.afs_entry_missing)
         val text = getString(R.string.afs_replace_confirm, e.name, now, newName,
             if (newSize >= 0) sizeText(newSize) else "?")
@@ -345,6 +505,14 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
             .setPositiveButton(R.string.afs_replace) { _, _ -> replace(folder, e, uri, newName) }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun removeReplacement(pos: Int) {
+        val e = fastScan?.entries?.getOrNull(pos) ?: return
+        e.repl = null
+        e.size = e.original
+        adapter.notifyItemChanged(pos)
+        refreshSummary()
     }
 
     private fun replace(folder: Folder, e: Entry, uri: Uri, newName: String) {
@@ -384,6 +552,10 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
 
     private fun prepareBuild() {
         if (busy) return
+        if (fastMode) {
+            prepareFast()
+            return
+        }
         val folder = buildFolder
         if (folder == null) {
             message(getString(R.string.need_build_folder))
@@ -408,7 +580,12 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
             setBusy(false)
             result.onSuccess { (plan, info) ->
                 status(null)
-                pendingBuild = Pair(folder, plan)
+                val ctx2 = requireContext().applicationContext
+                pendingWrite = { out ->
+                    writeAfs(out, plan.sizes, plan.header, plan.changed.size) { i ->
+                        Saf.openIn(ctx2, folder.child(plan.entries[i]!!.ref))
+                    }
+                }
                 val suggested = info?.name?.takeIf { it.isNotEmpty() } ?: "0_text.afs"
                 createAfs.launch(suggested)
             }.onFailure { e ->
@@ -418,18 +595,37 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
         }
     }
 
-    private fun writeAfs(folder: Folder, plan: AfsFolder.Plan<String>, out: Uri) {
+    /** Modo rápido: el AFS nuevo sale del original más los archivos reemplazados. */
+    private fun prepareFast() {
+        val afs = fastAfs
+        val s = fastScan
+        if (afs == null || s == null) {
+            message(getString(R.string.need_fast_afs))
+            return
+        }
+        val ctx = requireContext().applicationContext
+        val sizes = LongArray(s.entries.size) { i -> s.entries[i].size }
+        val changed = s.entries.count { it.repl != null }
+        pendingWrite = { out ->
+            writeAfs(out, sizes, afs.headerSize(), changed) { i ->
+                s.entries[i].repl?.let { Saf.openIn(ctx, it.uri) } ?: afs.inputStream(i)
+            }
+        }
+        createAfs.launch(fastName.ifEmpty { "0_text.afs" })
+    }
+
+    private fun writeAfs(out: Uri, sizes: LongArray, header: Long, changed: Int, open: (Int) -> java.io.InputStream) {
         setBusy(true)
         val ctx = requireContext().applicationContext
-        val n = plan.sizes.size
+        val n = sizes.size
         status("Creando el AFS: 0 de $n…")
         viewLifecycleOwner.lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     BufferedOutputStream(Saf.openOut(ctx, out), 1 shl 20).use { o ->
                         AfsWriter.write(
-                            o, plan.sizes, plan.header,
-                            open = { i -> Saf.openIn(ctx, folder.child(plan.entries[i]!!.ref)) },
+                            o, sizes, header,
+                            open = open,
                             progress = { done, total -> if (done % 250 == 0 || done == total) status("Creando el AFS: $done de $total…") },
                             prefetch = Parallel.IO_THREADS,
                         )
@@ -440,7 +636,7 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
             result.onSuccess { layout ->
                 val name = Saf.displayName(ctx, out, "AFS")
                 status(String.format(Locale.getDefault(), "AFS creado: %s · %d archivos · %s%s", name, n, sizeText(layout.total),
-                    if (plan.changed.isNotEmpty()) " · ${plan.changed.size} cambiados" else ""))
+                    if (changed > 0) " · $changed cambiados" else ""))
                 message(getString(R.string.afs_built, name, n, sizeText(layout.total)))
             }.onFailure { e ->
                 // No dejar un AFS a medias que parezca bueno.
@@ -469,10 +665,24 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
             Holder(LayoutInflater.from(parent.context).inflate(R.layout.item_afs_entry, parent, false))
 
         override fun onBindViewHolder(h: Holder, position: Int) {
-            val e = scan?.entries?.get(position) ?: return
+            val sc = current()
+            val e = sc?.entries?.get(position) ?: return
             h.name.text = e.name
             val normal = MaterialColors.getColor(h.status, MR.attr.colorOnSurfaceVariant)
+            val primary = MaterialColors.getColor(h.status, MR.attr.colorPrimary)
             when {
+                sc.fast && e.repl != null -> {
+                    h.status.text = getString(R.string.afs_entry_replaced, e.repl!!.name, sizeText(e.original))
+                    h.status.setTextColor(primary)
+                }
+                sc.fast && e.original == 0L -> {
+                    h.status.text = getString(R.string.afs_entry_empty)
+                    h.status.setTextColor(normal)
+                }
+                sc.fast -> {
+                    h.status.text = ""
+                    h.status.setTextColor(normal)
+                }
                 e.child == null && e.original == 0L -> {
                     h.status.text = getString(R.string.afs_entry_empty)
                     h.status.setTextColor(normal)
@@ -491,19 +701,21 @@ class AfsFragment : Fragment(R.layout.fragment_afs) {
                 }
             }
             h.status.visibility = if (h.status.text.isEmpty()) View.GONE else View.VISIBLE
-            h.size.text = if (e.child != null && e.size >= 0) sizeText(e.size) else "—"
+            h.size.text = if (sc.fast) (if (e.size > 0) sizeText(e.size) else "—")
+            else if (e.child != null && e.size >= 0) sizeText(e.size) else "—"
             h.itemView.setOnClickListener {
                 val p = h.bindingAdapterPosition
                 if (p != RecyclerView.NO_POSITION) onEntryTapped(p)
             }
         }
 
-        override fun getItemCount() = scan?.entries?.size ?: 0
+        override fun getItemCount() = current()?.entries?.size ?: 0
     }
 
     companion object {
         private const val KEY_DST = "afsExtractTree"
         private const val KEY_BUILD = "afsBuildFolder"
+        private const val KEY_FAST = "afsFastMode"
 
         fun sizeText(b: Long): String = when {
             b < 1024 -> "$b B"

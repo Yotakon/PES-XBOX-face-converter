@@ -100,4 +100,14 @@
     <string name="update_permission_message">Android necesita que permitas a esta app instalar aplicaciones. Pulsa «Abrir ajustes», activa el permiso y vuelve: la instalación seguirá sola.</string>
     <string name="update_open_settings">Abrir ajustes</string>
     <string name="update_signature_hint">Si Android dice que no se puede instalar, la app instalada está firmada con otra clave (por ejemplo una versión de prueba): desinstálala y vuelve a instalar.</string>
+
+    <!-- Modo rápido de Crear AFS -->
+    <string name="afs_fast_mode">Modo rápido (sin extraer)</string>
+    <string name="afs_fast_hint">Usa el AFS original directamente: no hace falta extraer los miles de archivos. Solo eliges los que quieres reemplazar y se crea el AFS nuevo leyendo el resto del original.</string>
+    <string name="afs_original">AFS original</string>
+    <string name="need_fast_afs">Primero busca el AFS original.</string>
+    <string name="afs_fast_empty">Busca el AFS original. Después toca los archivos que quieras reemplazar y pulsa Crear AFS. El AFS original no se modifica.</string>
+    <string name="afs_entry_replaced">reemplazado por «%1$s» (antes %2$s)</string>
+    <string name="afs_replace_confirm_fast">%1$s (%2$s) se sustituye por «%3$s» (%4$s) en el AFS nuevo. El AFS original no se modifica.</string>
+    <string name="afs_remove_replacement">Quitar reemplazo</string>
 </resources>

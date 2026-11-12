@@ -45,6 +45,30 @@ class Afs private constructor(
     /** Primeros [max] bytes (o menos) del archivo [i]. */
     fun readHead(i: Int, max: Int): ByteArray = readAt(channel, offsets[i], minOf(max.toLong(), sizes[i]).toInt())
 
+    /**
+     * Flujo de lectura del archivo [i]. Cada flujo lleva su propia posición, así que se pueden
+     * abrir varios a la vez (también desde hilos distintos) sin cargar el archivo en memoria.
+     */
+    fun inputStream(i: Int): InputStream = object : InputStream() {
+        private var pos = offsets[i]
+        private val end = offsets[i] + sizes[i]
+
+        override fun read(): Int {
+            val one = ByteArray(1)
+            return if (read(one, 0, 1) < 0) -1 else one[0].toInt() and 0xFF
+        }
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            if (pos >= end) return -1
+            val n = minOf(len.toLong(), end - pos).toInt()
+            if (n == 0) return 0
+            val r = channel.read(ByteBuffer.wrap(b, off, n), pos)
+            if (r < 0) throw IOException("fin de archivo inesperado")
+            pos += r
+            return r
+        }
+    }
+
     /** Copia el archivo [i] a [out] por bloques (sirve para archivos de cualquier tamaño). */
     fun copyTo(i: Int, out: OutputStream, buffer: ByteArray) {
         var pos = offsets[i]

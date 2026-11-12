@@ -55,6 +55,12 @@ AFS (donde cada archivo tiene un hueco fijo), se crea un AFS nuevo con todos los
   nombre del índice. También puedes reemplazarlos con un explorador de archivos, siempre que
   el nuevo tenga el nombre del índice. **Crear AFS** pide dónde guardar el AFS nuevo.
 
+**Modo rápido (casilla en «Crear AFS»):** no hace falta extraer. Marca la casilla, **Buscar** el AFS
+original y toca solo los archivos que quieras reemplazar (puedes quitar un reemplazo desde el mismo
+diálogo). **Crear AFS** escribe el AFS nuevo leyendo el resto de archivos del original, que no se
+modifica. Con miles de archivos ahorra mucho tiempo, porque no se crean ni se abren uno a uno en una
+carpeta. La casilla se recuerda; desmarcada, todo funciona como antes.
+
 Solo entran en el AFS los archivos llamados `00012.bin`, `12.bin` o `unnamed_12.bin`; los demás
 se ignoran (los nombres como `1701 FACE - ….bin` llevan el número de PES 2010, que no es el
 slot de PES 5). La app no crea el AFS si falta algún archivo, si hay dos para el mismo índice o
