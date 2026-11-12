@@ -31,26 +31,59 @@ jobs:
       - name: Pruebas del conversor
         run: gradle -p android testDebugUnitTest --stacktrace
 
-      - name: Compilar APK
-        run: gradle -p android assembleDebug --stacktrace
+      # La clave de firma está en los secretos del repositorio (Settings → Secrets and variables →
+      # Actions): SIGNING_KEYSTORE_BASE64, SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS y
+      # SIGNING_KEY_PASSWORD. Siempre la misma clave = el APK nuevo se instala encima del anterior.
+      - name: Preparar la clave de firma
+        if: github.ref == 'refs/heads/app-android'
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        run: |
+          if [ -z "$SIGNING_KEYSTORE_BASE64" ] || [ -z "$SIGNING_STORE_PASSWORD" ]; then
+            echo "::error::Faltan los secretos de firma (SIGNING_KEYSTORE_BASE64 / SIGNING_STORE_PASSWORD). No se publica un APK con otra firma."
+            exit 1
+          fi
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/pesport.jks"
+          echo "SIGNING_STORE_FILE=$RUNNER_TEMP/pesport.jks" >> "$GITHUB_ENV"
+
+      - name: Compilar APK firmado
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: |
+          export VERSION_CODE=$((100 + VERSION_CODE))
+          gradle -p android assembleRelease --stacktrace
+
+      - name: Comprobar la firma
+        if: github.ref == 'refs/heads/app-android'
+        run: |
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs android/app/build/outputs/apk/release/app-release.apk | tee firma.txt
+          if grep -q "CN=Android Debug" firma.txt; then
+            echo "::error::El APK está firmado con la clave de depuración"
+            exit 1
+          fi
 
       - name: Publicar APK (enlace directo)
         if: github.ref == 'refs/heads/app-android'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk PESFaceConverter.apk
+          cp android/app/build/outputs/apk/release/app-release.apk PESFaceConverter.apk
           gh release delete ultima --yes --cleanup-tag || true
           gh release create ultima PESFaceConverter.apk \
             --target "$GITHUB_SHA" --prerelease \
             --title "PES Face Converter (ultima compilacion)" \
-            --notes "APK de prueba compilado automaticamente desde la rama app-android ($GITHUB_SHA)."
+            --notes "APK firmado, compilado automaticamente desde la rama app-android ($GITHUB_SHA). Se instala encima de la version anterior."
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: apk-y-reportes
           path: |
-            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/release/*.apk
             android/app/build/reports/tests/
           if-no-files-found: ignore

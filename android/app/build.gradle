@@ -3,6 +3,14 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// Firma: la misma clave en todas las compilaciones para que el APK nuevo se instale encima del
+// anterior. La clave no está en el repositorio: GitHub Actions la saca de los secretos del repo
+// y la pasa con estas variables de entorno. Sin ellas (compilación local) se firma con la clave
+// de depuración del equipo.
+def signingStore = System.getenv('SIGNING_STORE_FILE')
+def signingPassword = System.getenv('SIGNING_STORE_PASSWORD')
+def hasReleaseKey = signingStore && signingPassword && file(signingStore).exists()
+
 android {
     namespace 'com.yotakon.pesport'
     compileSdk 34
@@ -11,14 +19,27 @@ android {
         applicationId 'com.yotakon.pesport'
         minSdk 21
         targetSdk 34
-        versionCode 5
+        // Cada compilación de GitHub Actions sube el número (VERSION_CODE = 100 + nº de ejecución).
+        versionCode((System.getenv('VERSION_CODE') ?: '5') as int)
         versionName '2.0'
         vectorDrawables.useSupportLibrary true
+    }
+
+    signingConfigs {
+        if (hasReleaseKey) {
+            release {
+                storeFile file(signingStore)
+                storePassword signingPassword
+                keyAlias System.getenv('SIGNING_KEY_ALIAS') ?: 'pesport'
+                keyPassword System.getenv('SIGNING_KEY_PASSWORD') ?: signingPassword
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig hasReleaseKey ? signingConfigs.release : signingConfigs.debug
         }
     }
 
