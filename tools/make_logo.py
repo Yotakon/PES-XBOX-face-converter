@@ -6,8 +6,8 @@ Necesita: pip install pillow numpy scipy
 
 Despues, para crear los iconos de Android:  python3 tools/make_icons.py icono.png
 
-Logo: circulo verde estilo Xbox con borde blanco, las formas de la X de Xbox en blanco
-(transparentes) al fondo y un 5 amarillo italico estilo PES 5 delante.
+Logo minimalista: circulo verde (el verde de Xbox) con borde blanco y un 5 amarillo italico
+estilo PES 5. Sin ningun logo ni forma de Xbox.
 Salida: 1254x1254, circulo sobre blanco (es el formato que espera make_icons.py).
 """
 import os
@@ -20,7 +20,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 W = 1254
 C = W / 2
 
-GREEN_CENTER = (46, 178, 40)     # verde Xbox, mas claro en el centro
+GREEN_CENTER = (46, 178, 40)     # verde, mas claro en el centro
 GREEN_EDGE = (14, 112, 20)
 YELLOW = (255, 214, 20)
 OUTLINE = (5, 58, 10)            # verde muy oscuro, casi negro
@@ -51,28 +51,6 @@ def radial_background():
     d = np.clip(np.sqrt((x - C) ** 2 + (y - C + 80) ** 2) / (W * 0.62), 0, 1)
     a, b = np.array(GREEN_CENTER, float), np.array(GREEN_EDGE, float)
     return Image.fromarray((a + (b - a) * d[..., None]).astype("uint8"), "RGB")
-
-
-def bezier(p0, p1, p2, n=1200):
-    t = np.linspace(0, 1, n)[:, None]
-    return (1 - t) ** 2 * np.array(p0) + 2 * (1 - t) * t * np.array(p1) + t ** 2 * np.array(p2)
-
-
-def x_shapes(radius, ss=2):
-    """Las dos bandas curvas cruzadas de la X de Xbox, como mascara 'L' del tamaño del icono."""
-    S = W * ss
-    m = Image.new("L", (S, S), 0)
-    d = ImageDraw.Draw(m)
-    bow = 0.20
-    strokes = [((-1.05, -1.1), (bow, -bow), (1.05, 1.1)),
-               ((1.05, -1.1), (-bow, -bow), (-1.05, 1.1))]
-    for p0, p1, p2 in strokes:
-        for i, (px, py) in enumerate(bezier(p0, p1, p2)):
-            t = i / 1199
-            hw = (0.17 + 0.10 * abs(2 * t - 1) ** 1.3) * radius * ss
-            cx, cy = C * ss + px * radius * ss, C * ss + py * radius * ss
-            d.ellipse((cx - hw, cy - hw, cx + hw, cy + hw), fill=255)
-    return m.resize((W, W), Image.LANCZOS)
 
 
 def five_layer(height):
@@ -117,13 +95,8 @@ def five_layer(height):
 
 def main():
     inner_r = C - 2
-    # circulo verde con la X de Xbox en blanco (transparente)
+    # circulo verde liso
     art = radial_background().convert("RGBA")
-    white = Image.new("RGBA", (W, W), (255, 255, 255, 255))
-    inside_ring = disc(W, C, C, C * 0.93 - 40)      # las formas no pasan del borde blanco
-    xa = ImageChops.multiply(x_shapes(C).point(lambda v: int(v * 0.30)), inside_ring)
-    white.putalpha(xa)
-    art.alpha_composite(white)
 
     # borde blanco del circulo, un poco hacia dentro (el verde queda por fuera)
     ring = ImageChops.subtract(disc(W, C, C, C * 0.93), disc(W, C, C, C * 0.93 - 40))
