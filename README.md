@@ -3,7 +3,7 @@
 Convierte FACES y HAIRS de **PES 2010 PS2** al formato de **PES 5 Xbox**.
 
 - **App Android** (`android/`, en Kotlin): tres pestañas. **Convertir** pasa los `.bin` de
-  PES 2010 a PES 5 Xbox; **Extraer e Importar F & H** busca y extrae FACES y HAIRS del 0_TEXT.AFS de
+  PES 2010 a PES 5 Xbox; **Extraer F & H** busca y extrae FACES y HAIRS del 0_TEXT.AFS de
   PES 2010; **AFS** extrae un AFS a una carpeta y crea un AFS de PES 5 a partir de una carpeta.
 - **Conversor de referencia en Python** (`tools/pesport/`): misma conversión desde la línea de
   comandos. Es la versión que se validó en el juego; la app produce exactamente los mismos bytes.
@@ -15,7 +15,7 @@ Convierte FACES y HAIRS de **PES 2010 PS2** al formato de **PES 5 Xbox**.
 Pestaña **Convertir**:
 
 1. Extrae del `0_text.afs` de PES 2010 PS2 los `.bin` del FACE y el HAIR del jugador
-   (pestaña **Extraer e Importar F & H**).
+   (pestaña **Extraer F & H**).
 2. **Añadir .bin** → elige uno o varios.
 3. En cada HAIR, pulsa **Color** y elige el color y el brillo (PES 2010 guarda el HAIR en gris
    y el juego lo tiñe; PES 5 necesita la textura ya coloreada).
@@ -26,7 +26,7 @@ Pestaña **Convertir**:
 Descarga del APK de prueba (última compilación de la rama `app-android`):
 <https://github.com/Yotakon/PES-XBOX-face-converter/releases/download/ultima/PESFaceConverter.apk>
 
-## Pestaña Extraer e Importar F & H (caras y pelos del 0_TEXT.AFS)
+## Pestaña Extraer F & H (caras y pelos del 0_TEXT.AFS)
 
 - **Subpestaña 0_TEXT.AFS:** **Buscar** el AFS. El registro muestra cuántas FACES y HAIRS tiene
   (en PES 2010 PS2: 1431 FACES en los archivos 1527–2957 y 1147 HAIRS en 4468–5614). La lista

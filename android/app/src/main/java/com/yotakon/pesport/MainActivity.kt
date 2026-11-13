@@ -29,7 +29,7 @@ import java.io.IOException
 /**
  * Pantalla principal con tres pestañas:
  * 1. Convertir: FACES y HAIRS de PES 2010 PS2 a PES 5 Xbox.
- * 2. Extraer e Importar F & H: buscar FACES y HAIRS en el 0_TEXT.AFS de PES 2010 y extraerlos.
+ * 2. Extraer F & H: buscar FACES y HAIRS en el 0_TEXT.AFS de PES 2010 y extraerlos.
  * 3. AFS: extraer un AFS a una carpeta y crear un AFS para PES 5 a partir de una carpeta.
  *
  * El botón de la barra verde busca una versión nueva de la app en GitHub y la instala.

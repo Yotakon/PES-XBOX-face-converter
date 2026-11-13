@@ -46,7 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import com.google.android.material.R as MR
 
 /**
- * Pestaña Extraer e Importar F & H: caras y pelos del 0_TEXT.AFS de PES 2010 PS2.
+ * Pestaña Extraer F & H: caras y pelos del 0_TEXT.AFS de PES 2010 PS2.
  * Subpestaña 1: busca el AFS, cuenta FACES y HAIRS, empareja cada FACE con su HAIR y los extrae
  * renombrados. Subpestaña 2: abre una carpeta de .bin extraídos y muestra las parejas con previa.
  */
